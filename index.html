@@ -177,7 +177,7 @@
           <div class="foot">
             Population after 1 year: <strong id="natPerAcre">—</strong> per acre
           </div>
-          <div class="owlNote" id="natOwl">Owl removal (est.): — / year</div>
+          <div class="owlNote" id="natOwl">Owl effect: —/acre · Removal est.: —/yr · Damage change: —</div>
         </div>
 
         <!-- Treated -->
@@ -193,71 +193,64 @@
           <div class="foot">
             Population after 1 year: <strong id="trtPerAcre">—</strong> per acre
           </div>
-          <div class="owlNote" id="trtOwl">Owl removal (est.): — / year</div>
+          <div class="owlNote" id="trtOwl">Owl effect: —/acre · Removal est.: —/yr · Damage change: —</div>
         </div>
       </div>
-      <div class="owlNote" style="margin-top:10px;">Note: Owl Boxes affect population only; damages use the selected severity per the model.</div>
+      <div class="owlNote" style="margin-top:10px;">Note: Owl Boxes now reduce damages in proportion to the population reduction they cause (yield lightly, non-yield more).</div>
     </section>
   </div>
 
 <script>
-/* ------------------------------ Deterministic Model (ported from your C++) ------------------------------ */
+/* ------------------------------ Deterministic Model (ported + owl damage discounts) ------------------------------ */
 const Model = (() => {
-  // Owl density
+  // === CONSTANTS (from your C++)
   const owlsPer100Acres = 1.9;
 
-  // Ecology (gophers, irrigated almonds)
   const K_per_acre = 80.0;
   const litterMean = 6.0;
   const birthFracFemale = 0.70;
   const breederFrac = 0.80;
   const fertSlope  = 3.5;
 
-  // Annual survival (deterministic at means)
   const survJ = 0.45, survS = 0.65, survA = 0.82;
-
-  // Adult aging
   const agingA = 0.08;
 
-  // Treatment: CO₂ (25% kill/pass, 6 passes/year)
   const passesPerYear = 6, killRatePerPass = 0.25;
   const surviveAnnual = Math.pow(1.0 - killRatePerPass, passesPerYear); // (0.75)^6
 
-  // Almond economics (program cost removed)
   const pricePerLb = 2.50, yieldLbPerAcre = 2500.0;
   const lossMild=0.02, lossMedium=0.04, lossSevere=0.06, lossAfterTreat=0.01;
 
-  // Damage baselines per acre
   const dripPerAcre_base=60.0, cropDmgPerAcre_base=40.0, otherPerAcre_base=70.0;
-
-  // Severity multiplier for NATURAL only
   const sevMultMild=0.8, sevMultMed=1.0, sevMultSev=1.2;
-
-  // After treatment, non-yield damages are 20% of baseline
   const maintMultiplierAfterTreat=0.20;
+
+  // === OWL → DAMAGE DISCOUNT TUNING
+  const gamma = 3.0;          // amplifies population reduction into visible $ effect
+  const betaYield = 0.30;     // how much yield loss responds to owl reduction
+  const betaNon   = 0.60;     // how much non-yield responds (drip/crop damage/other)
 
   const basePer10 = lvl => lvl===1?20.0:(lvl===2?40.0:70.0);
   const sevMult = lvl => lvl===1?sevMultMild:(lvl===2?sevMultMed:sevMultSev);
   const lossRate = lvl => lvl===1?lossMild:(lvl===2?lossMedium:lossSevere);
 
-  // Annual step → returns {P, removed}
+  // one annual step; returns {P, removed}
   function annualStep(P, acres, owlsOn){
     let [Jf,Jm,Sf,Sm,Af,Am] = [P[0][0],P[0][1],P[1][0],P[1][1],P[2][0],P[2][1]];
     const K_total = K_per_acre * acres;
     const total   = Jf+Jm+Sf+Sm+Af+Am;
     const density = K_total>0 ? total / K_total : 0.0;
 
-    // Density-dependent fertility (logistic taper)
     const fertMult = 1 / (1 + Math.exp(fertSlope * (density - 1.0)));
 
-    // Reproduction (deterministic: litter = mean)
+    // reproduction (deterministic)
     const litter = litterMean;
     const breeders = Af * breederFrac;
     const births = breeders * litter * fertMult;
     const pupsF  = births * birthFracFemale;
     const pupsM  = births * (1 - birthFracFemale);
 
-    // Transitions
+    // transitions
     let nextJf = pupsF;
     let nextJm = pupsM;
     let nextSf = Jf * survJ;
@@ -265,15 +258,15 @@ const Model = (() => {
     let nextAf = Sf * survS + Af * survA;
     let nextAm = Sm * survS + Am * survA;
 
-    // Adult aging
+    // aging
     nextAf = Math.max(0, nextAf - Af * agingA);
     nextAm = Math.max(0, nextAm - Am * agingA);
 
-    // Owl predation (annual, proportional), scaled by density
+    // owl predation
     let removed = 0;
     if (owlsOn){
       const owlsEff = owlsPer100Acres * (acres/100.0);
-      const perOwlPerWeek = 2.5; // midpoint of 1–4
+      const perOwlPerWeek = 2.5; // midpoint 1–4
       const owlRemoval = owlsEff * perOwlPerWeek * 52.0 * Math.max(0, Math.min(1, density));
       const afterTot = nextJf + nextJm + nextSf + nextSm + nextAf + nextAm;
       if (afterTot > 0 && owlRemoval > 0){
@@ -295,48 +288,96 @@ const Model = (() => {
     return { N:[[0,0],[0,0],[Af,Am]], T:[[0,0],[0,0],[Af,Am]] };
   }
 
-  function damages(acres, level, isTreated){
-    const rate = isTreated ? lossAfterTreat : lossRate(level); // severity fixed by user for NATURAL; treated = 1%
-    const sm = isTreated ? 1.0 : sevMult(level);
+  // Compute damages; optional factors = {yieldFactor, nonYieldFactor}
+  function damages(acres, level, isTreated, factors){
+    const fYield = factors ? factors.yieldFactor : 1.0;
+    const fNon   = factors ? factors.nonYieldFactor : 1.0;
 
-    const baseRevenue = acres * yieldLbPerAcre * pricePerLb;
-    const lossOfCrop = baseRevenue * rate;
+    const baseRev = acres * yieldLbPerAcre * pricePerLb;
+    const baseRate = isTreated ? lossAfterTreat : lossRate(level);
+    const lossRateAdj = baseRate * fYield;
+    const lossOfCrop = baseRev * lossRateAdj;
 
-    let drip  = dripPerAcre_base    * sm * acres;
-    let cropD = cropDmgPerAcre_base * sm * acres;
-    let other = otherPerAcre_base   * sm * acres;
+    // non-yield bases
+    const baseMult = isTreated ? 1.0 : sevMult(level);
+    let drip  = dripPerAcre_base    * baseMult * acres;
+    let cropD = cropDmgPerAcre_base * baseMult * acres;
+    let other = otherPerAcre_base   * baseMult * acres;
 
     if (isTreated){
-      drip *= maintMultiplierAfterTreat;
-      cropD*= maintMultiplierAfterTreat;
-      other*= maintMultiplierAfterTreat;
+      drip  *= maintMultiplierAfterTreat;
+      cropD *= maintMultiplierAfterTreat;
+      other *= maintMultiplierAfterTreat;
     }
+
+    drip  *= fNon;
+    cropD *= fNon;
+    other *= fNon;
+
     return { lossOfCrop, drip, cropD, other, total: lossOfCrop + drip + cropD + other };
   }
 
+  // Project both OFF and ON; return whichever matches owlsOn, plus deltas
   function project({ acres, level, owlsOn }){
     const { N, T } = initialize(acres, level);
 
-    // Year 1 natural
-    const Nres = annualStep(N, acres, owlsOn);
-    const N1 = Nres.P;
+    // --- Baseline (owls OFF)
+    const N_off = annualStep(N, acres, false);
+    const T_off = annualStep(T, acres, false);
+    const T_off_after = [[...T_off.P[0]],[...T_off.P[1]],[...T_off.P[2]]];
+    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T_off_after[a][s] *= surviveAnnual;
 
-    // Year 1 treated: owl step then CO₂ survival factor
-    const Tres = annualStep(T, acres, owlsOn);
-    const T1 = [[...Tres.P[0]],[...Tres.P[1]],[...Tres.P[2]]];
-    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T1[a][s] *= surviveAnnual;
+    const natPA_off = sumAll(N_off.P)/acres;
+    const trtPA_off = sumAll(T_off_after)/acres;
+    const dN_base = damages(acres, level, false, null);
+    const dT_base = damages(acres, level, true , null);
 
-    const natPerAcre = Math.round(sumAll(N1)/acres);
-    const trtPerAcre = Math.round(sumAll(T1)/acres);
+    // --- With owls (owls ON)
+    const N_on  = annualStep(N, acres, true);
+    const T_on  = annualStep(T, acres, true);
+    const T_on_after = [[...T_on.P[0]],[...T_on.P[1]],[...T_on.P[2]]];
+    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T_on_after[a][s] *= surviveAnnual;
 
-    const dN = damages(acres, level, false);
-    const dT = damages(acres, level, true);
+    const natPA_on = sumAll(N_on.P)/acres;
+    const trtPA_on = sumAll(T_on_after)/acres;
+
+    // population reduction fractions
+    const eps=1e-9;
+    const rN = Math.max(0, (natPA_off - natPA_on)/Math.max(eps, natPA_off));
+    const rT = Math.max(0, (trtPA_off - trtPA_on)/Math.max(eps, trtPA_off));
+    const rHatN = Math.min(1, gamma * rN);
+    const rHatT = Math.min(1, gamma * rT);
+
+    const factorsN = { yieldFactor: 1 - betaYield*rHatN, nonYieldFactor: 1 - betaNon*rHatN };
+    const factorsT = { yieldFactor: 1 - betaYield*rHatT, nonYieldFactor: 1 - betaNon*rHatT };
+
+    const dN_owl = damages(acres, level, false, factorsN);
+    const dT_owl = damages(acres, level, true , factorsT);
+
+    // choose which to display based on current toggle
+    const natPerAcre = owlsOn ? natPA_on : natPA_off;
+    const trtPerAcre = owlsOn ? trtPA_on : trtPA_off;
+    const dN = owlsOn ? dN_owl : dN_base;
+    const dT = owlsOn ? dT_owl : dT_base;
+
+    const natRemoved = owlsOn ? Math.round(N_on.removed) : 0;
+    const trtRemoved = owlsOn ? Math.round(T_on.removed) : 0;
+
+    // deltas for UI (only meaningful when owlsOn)
+    const natDelta = owlsOn ? (dN_base.total - dN_owl.total) : 0;
+    const trtDelta = owlsOn ? (dT_base.total - dT_owl.total) : 0;
+    const natDeltaPct = owlsOn && dN_base.total>0 ? (natDelta/dN_base.total) : 0;
+    const trtDeltaPct = owlsOn && dT_base.total>0 ? (trtDelta/dT_base.total) : 0;
+
+    const owlPerAcreDropN = owlsOn ? (natPA_off - natPA_on) : 0;
+    const owlPerAcreDropT = owlsOn ? (trtPA_off - trtPA_on) : 0;
 
     return {
       natPerAcre, trtPerAcre,
       dN, dT,
-      natRemoved: Math.round(Nres.removed),
-      trtRemoved: Math.round(Tres.removed) // removal occurs pre-CO₂
+      natRemoved, trtRemoved,
+      owlPerAcreDropN, owlPerAcreDropT,
+      natDelta, trtDelta, natDeltaPct, trtDeltaPct
     };
   }
 
@@ -363,7 +404,7 @@ const natOwlEl = $("#natOwl");
 const trtOwlEl = $("#trtOwl");
 
 function fmtMoney(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
-function fmtInt(n){ return Math.round(n).toLocaleString("en-US"); }
+function fmtPct(x){ return (x*100).toFixed(1) + "%"; }
 
 function setAcreBubble(){
   const min = +acreRange.min, max = +acreRange.max, val = +acreRange.value;
@@ -383,8 +424,12 @@ function render(){
   const level = activeLevel();
   const owlsOn = owlsChk.checked;
 
-  const { natPerAcre, trtPerAcre, dN, dT, natRemoved, trtRemoved } =
-    Model.project({ acres, level, owlsOn });
+  const {
+    natPerAcre, trtPerAcre, dN, dT,
+    natRemoved, trtRemoved,
+    owlPerAcreDropN, owlPerAcreDropT,
+    natDelta, trtDelta, natDeltaPct, trtDeltaPct
+  } = Model.project({ acres, level, owlsOn });
 
   // Natural
   natTotalEl.textContent = fmtMoney(dN.total);
@@ -395,8 +440,10 @@ function render(){
     <tr><td>Other O&amp;M</td><td>${fmtMoney(dN.other)}</td></tr>
     <tr><td>Total</td><td>${fmtMoney(dN.total)}</td></tr>
   `;
-  natPerAcreEl.textContent = `${natPerAcre}`;
-  natOwlEl.textContent = owlsOn ? `Owl removal (est.): ${fmtInt(natRemoved)} / year` : `Owl removal (est.): 0 / year`;
+  natPerAcreEl.textContent = natPerAcre.toFixed(1);
+  natOwlEl.textContent = owlsOn
+    ? `Owl effect: −${owlPerAcreDropN.toFixed(1)}/acre · Removal est.: ${Math.round(natRemoved).toLocaleString()} / yr · Damage change: −${fmtMoney(natDelta)} (−${fmtPct(natDeltaPct)})`
+    : `Owl effect: 0.0/acre · Removal est.: 0 / yr · Damage change: $0 (0%)`;
 
   // Treated
   trtTotalEl.textContent = fmtMoney(dT.total);
@@ -407,8 +454,10 @@ function render(){
     <tr><td>Other O&amp;M</td><td>${fmtMoney(dT.other)}</td></tr>
     <tr><td>Total</td><td>${fmtMoney(dT.total)}</td></tr>
   `;
-  trtPerAcreEl.textContent = `${trtPerAcre}`;
-  trtOwlEl.textContent = owlsOn ? `Owl removal (est.): ${fmtInt(trtRemoved)} / year` : `Owl removal (est.): 0 / year`;
+  trtPerAcreEl.textContent = trtPerAcre.toFixed(1);
+  trtOwlEl.textContent = owlsOn
+    ? `Owl effect: −${owlPerAcreDropT.toFixed(1)}/acre · Removal est.: ${Math.round(trtRemoved).toLocaleString()} / yr · Damage change: −${fmtMoney(trtDelta)} (−${fmtPct(trtDeltaPct)})`
+    : `Owl effect: 0.0/acre · Removal est.: 0 / yr · Damage change: $0 (0%)`;
 }
 
 // Events
