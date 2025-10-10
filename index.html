@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Smokin’ Burrow – Gopher Impact Estimator (1-Year)</title>
+<title>Smokin’ Burrow – Rodent Impact Estimator (1-Year)</title>
 <style>
   :root{
     --yellow:#f4cf2f; --ink:#0f172a; --muted:#6b7280; --border:#e5e7eb;
@@ -24,39 +24,34 @@
   .left{ background:var(--yellow); padding:32px 26px; display:flex; flex-direction:column; gap:26px; }
   .right{ background:var(--card); padding:28px 26px; }
 
-  /* Left header */
   .lead{ display:flex; flex-direction:column; gap:8px; }
   .lead h1{ margin:0; font-size:28px; line-height:1.15; letter-spacing:-0.01em; }
   .lead .sub{ font-size:14px; opacity:.85; }
 
-  /* Groups */
   .group{ display:flex; flex-direction:column; gap:12px; }
   .label{ font-weight:800; font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
 
-  /* Segmented control — full-width 3-tile layout */
+  /* Segmented full-width tiles */
   .segmented{
-    display:grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap:0;
-    width:100%;
-    padding:6px;
-    border-radius:14px;
-    background:rgba(255,255,255,.50);
+    display:grid; grid-template-columns: repeat(3, 1fr);
+    width:100%; padding:6px; gap:0;
+    border-radius:14px; background:rgba(255,255,255,.50);
     border:2px solid rgba(0,0,0,.06);
   }
   .segmented button{
-    appearance:none; border:0; cursor:pointer;
-    width:100%; padding:14px 0;
-    font-weight:800; font-size:15px; color:#0f172a;
-    background:transparent; border-radius:10px;
-    border:2px solid transparent;
-    transition:background .12s ease, transform .06s ease, box-shadow .12s ease;
+    appearance:none; border:0; cursor:pointer; width:100%; padding:14px 0;
+    font-weight:800; font-size:15px; color:#0f172a; background:transparent;
+    border-radius:10px; border:2px solid transparent;
+    transition:background .12s ease, transform .06s ease, box-shadow .12s ease, opacity .12s ease;
   }
   .segmented button:hover{ background:rgba(255,255,255,.35); }
   .segmented button:active{ transform:translateY(1px); }
   .segmented button.active{
     background:#ffffff; border-color:rgba(0,0,0,.06);
     box-shadow:0 8px 20px rgba(0,0,0,.10);
+  }
+  .segmented button.inactive{
+    opacity:.55;
   }
 
   /* Slider + bubble */
@@ -113,6 +108,8 @@
   .foot{ margin-top:10px; color:#6b7280; font-size:12px; }
   .owlNote{ margin-top:6px; color:#6b7280; font-size:12px; }
 
+  .footSmall{ margin-top:6px; color:#6b7280; font-size:12px; }
+
   @media (max-width:980px){
     .wrap{ grid-template-columns:1fr; }
     .grid{ grid-template-columns:1fr; }
@@ -125,6 +122,17 @@
     <section class="panel left" aria-label="Controls">
       <div class="lead">
         <h1>See how much rodents cost you</h1>
+        <div class="sub">Toggle rodent types, set severity & acres. Results update instantly.</div>
+      </div>
+
+      <!-- Rodent Types (multi-select) -->
+      <div class="group">
+        <div class="label">Rodent Types</div>
+        <div class="segmented" role="group" aria-label="Rodent Types">
+          <button type="button" class="speciesbtn active" data-id="gopher" aria-pressed="true">Gophers</button>
+          <button type="button" class="speciesbtn inactive" data-id="rat" aria-pressed="false">Rats</button>
+          <button type="button" class="speciesbtn inactive" data-id="squirrel" aria-pressed="false">Ground&nbsp;Squirrels</button>
+        </div>
       </div>
 
       <!-- Infestation Level -->
@@ -176,6 +184,7 @@
           <div class="foot">
             Population after 1 year: <strong id="natPerAcre">—</strong> per acre
           </div>
+          <div class="footSmall" id="natPerSpecies">—</div>
           <div class="owlNote" id="natOwl">Owl effect: —/acre · Removal est.: —/yr · Damage change: —</div>
         </div>
 
@@ -192,205 +201,267 @@
           <div class="foot">
             Population after 1 year: <strong id="trtPerAcre">—</strong> per acre
           </div>
+          <div class="footSmall" id="trtPerSpecies">—</div>
           <div class="owlNote" id="trtOwl">Owl effect: —/acre · Removal est.: —/yr · Damage change: —</div>
         </div>
       </div>
-      <div class="owlNote" style="margin-top:10px;">Note: Owl Boxes now reduce damages in proportion to the population reduction they cause (yield lightly, non-yield more).</div>
+      <div class="owlNote" style="margin-top:10px;">
+        Note: Owl Boxes reduce damages in proportion to the population reduction they cause (yield lightly, non-yield more). Species use gopher constants by default — update in <code>SPECIES</code> below when you’re ready.
+      </div>
     </section>
   </div>
 
 <script>
-/* ------------------------------ Deterministic Model (ported + owl damage discounts) ------------------------------ */
-const Model = (() => {
-  // === CONSTANTS (from your C++)
-  const owlsPer100Acres = 1.9;
+/* ------------------------------ Species-configurable deterministic model ------------------------------ */
+/* If you have species-specific constants from your other module, paste them into SPECIES. */
+const SPECIES = {
+  gopher: {
+    name: "Gophers",
+    owlEffectFactor: 1.0, // scale owl predation power for this species
+    // Biology
+    K_per_acre: 80.0,
+    litterMean: 6.0,
+    birthFracFemale: 0.70,
+    breederFrac: 0.80,
+    fertSlope: 3.5,
+    survJ: 0.45, survS: 0.65, survA: 0.82,
+    agingA: 0.08,
+    // Initialization per severity (per 10 acres)
+    basePer10: {1:20.0, 2:40.0, 3:70.0},
+    // Economics (almonds)
+    pricePerLb: 2.50, yieldLbPerAcre: 2500.0,
+    lossRate: {1:0.02, 2:0.04, 3:0.06}, lossAfterTreat: 0.01,
+    dripPerAcre: 60.0, cropDmgPerAcre: 40.0, otherPerAcre: 70.0,
+    sevMult: {1:0.8, 2:1.0, 3:1.2},
+    maintMultiplierAfterTreat: 0.20,
+  },
+  rat: {
+    name: "Rats",
+    owlEffectFactor: 1.0, // TODO: adjust if your prior model differed
+    // For now, copy gopher constants; replace with your rat constants when available
+    K_per_acre: 80.0, litterMean: 6.0, birthFracFemale: 0.70, breederFrac: 0.80, fertSlope: 3.5,
+    survJ: 0.45, survS: 0.65, survA: 0.82, agingA: 0.08,
+    basePer10: {1:20.0, 2:40.0, 3:70.0},
+    pricePerLb: 2.50, yieldLbPerAcre: 2500.0,
+    lossRate: {1:0.02, 2:0.04, 3:0.06}, lossAfterTreat: 0.01,
+    dripPerAcre: 60.0, cropDmgPerAcre: 40.0, otherPerAcre: 70.0,
+    sevMult: {1:0.8, 2:1.0, 3:1.2},
+    maintMultiplierAfterTreat: 0.20,
+  },
+  squirrel: {
+    name: "Ground Squirrels",
+    owlEffectFactor: 1.0, // TODO: adjust if your prior model differed
+    // For now, copy gopher constants; replace with your squirrel constants when available
+    K_per_acre: 80.0, litterMean: 6.0, birthFracFemale: 0.70, breederFrac: 0.80, fertSlope: 3.5,
+    survJ: 0.45, survS: 0.65, survA: 0.82, agingA: 0.08,
+    basePer10: {1:20.0, 2:40.0, 3:70.0},
+    pricePerLb: 2.50, yieldLbPerAcre: 2500.0,
+    lossRate: {1:0.02, 2:0.04, 3:0.06}, lossAfterTreat: 0.01,
+    dripPerAcre: 60.0, cropDmgPerAcre: 40.0, otherPerAcre: 70.0,
+    sevMult: {1:0.8, 2:1.0, 3:1.2},
+    maintMultiplierAfterTreat: 0.20,
+  }
+};
 
-  const K_per_acre = 80.0;
-  const litterMean = 6.0;
-  const birthFracFemale = 0.70;
-  const breederFrac = 0.80;
-  const fertSlope  = 3.5;
+// Treatment: CO₂ (25% kill/pass, 6 passes/year)
+const PASSES_PER_YEAR = 6, KILL_RATE_PER_PASS = 0.25;
+const SURVIVE_ANNUAL = Math.pow(1 - KILL_RATE_PER_PASS, PASSES_PER_YEAR); // (0.75)^6
 
-  const survJ = 0.45, survS = 0.65, survA = 0.82;
-  const agingA = 0.08;
+// Owl predation base
+const OWLS_PER_100_ACRES = 1.9;
+const PREDATION_PER_OWL_PER_WEEK = 2.5; // midpoint of 1–4
 
-  const passesPerYear = 6, killRatePerPass = 0.25;
-  const surviveAnnual = Math.pow(1.0 - killRatePerPass, passesPerYear); // (0.75)^6
+// Owl → damage discount tuning (same as previous version)
+const GAMMA = 3.0;     // amplify population reduction into visible $ effect
+const BETA_YIELD = 0.30;
+const BETA_NON   = 0.60;
 
-  const pricePerLb = 2.50, yieldLbPerAcre = 2500.0;
-  const lossMild=0.02, lossMedium=0.04, lossSevere=0.06, lossAfterTreat=0.01;
+function cloneP(P){ return [[P[0][0],P[0][1]],[P[1][0],P[1][1]],[P[2][0],P[2][1]]]; }
+const sumAll = P => P[0][0]+P[0][1]+P[1][0]+P[1][1]+P[2][0]+P[2][1];
 
-  const dripPerAcre_base=60.0, cropDmgPerAcre_base=40.0, otherPerAcre_base=70.0;
-  const sevMultMild=0.8, sevMultMed=1.0, sevMultSev=1.2;
-  const maintMultiplierAfterTreat=0.20;
+function initializeSpecies(spec, acres, level){
+  const totalInit = spec.basePer10[level] * (acres/10.0);
+  const Af = totalInit * spec.birthFracFemale;
+  const Am = totalInit * (1.0 - spec.birthFracFemale);
+  return [[0,0],[0,0],[Af,Am]]; // [J][S][A] x [F,M]
+}
 
-  // === OWL → DAMAGE DISCOUNT TUNING
-  const gamma = 3.0;          // amplifies population reduction into visible $ effect
-  const betaYield = 0.30;     // how much yield loss responds to owl reduction
-  const betaNon   = 0.60;     // how much non-yield responds (drip/crop damage/other)
+function annualStepSpecies(spec, P, acres, owlsOn){
+  let [Jf,Jm,Sf,Sm,Af,Am] = [P[0][0],P[0][1],P[1][0],P[1][1],P[2][0],P[2][1]];
+  const K_total = spec.K_per_acre * acres;
+  const total   = Jf+Jm+Sf+Sm+Af+Am;
+  const density = K_total>0 ? total / K_total : 0.0;
 
-  const basePer10 = lvl => lvl===1?20.0:(lvl===2?40.0:70.0);
-  const sevMult = lvl => lvl===1?sevMultMild:(lvl===2?sevMultMed:sevMultSev);
-  const lossRate = lvl => lvl===1?lossMild:(lvl===2?lossMedium:lossSevere);
+  const fertMult = 1 / (1 + Math.exp(spec.fertSlope * (density - 1.0)));
 
-  // one annual step; returns {P, removed}
-  function annualStep(P, acres, owlsOn){
-    let [Jf,Jm,Sf,Sm,Af,Am] = [P[0][0],P[0][1],P[1][0],P[1][1],P[2][0],P[2][1]];
-    const K_total = K_per_acre * acres;
-    const total   = Jf+Jm+Sf+Sm+Af+Am;
-    const density = K_total>0 ? total / K_total : 0.0;
+  // reproduction
+  const litter = spec.litterMean;
+  const breeders = Af * spec.breederFrac;
+  const births = breeders * litter * fertMult;
+  const pupsF  = births * spec.birthFracFemale;
+  const pupsM  = births * (1 - spec.birthFracFemale);
 
-    const fertMult = 1 / (1 + Math.exp(fertSlope * (density - 1.0)));
+  // transitions
+  let nextJf = pupsF;
+  let nextJm = pupsM;
+  let nextSf = Jf * spec.survJ;
+  let nextSm = Jm * spec.survJ;
+  let nextAf = Sf * spec.survS + Af * spec.survA;
+  let nextAm = Sm * spec.survS + Am * spec.survA;
 
-    // reproduction (deterministic)
-    const litter = litterMean;
-    const breeders = Af * breederFrac;
-    const births = breeders * litter * fertMult;
-    const pupsF  = births * birthFracFemale;
-    const pupsM  = births * (1 - birthFracFemale);
+  // aging
+  nextAf = Math.max(0, nextAf - Af * spec.agingA);
+  nextAm = Math.max(0, nextAm - Am * spec.agingA);
 
-    // transitions
-    let nextJf = pupsF;
-    let nextJm = pupsM;
-    let nextSf = Jf * survJ;
-    let nextSm = Jm * survJ;
-    let nextAf = Sf * survS + Af * survA;
-    let nextAm = Sm * survS + Am * survA;
-
-    // aging
-    nextAf = Math.max(0, nextAf - Af * agingA);
-    nextAm = Math.max(0, nextAm - Am * agingA);
-
-    // owl predation
-    let removed = 0;
-    if (owlsOn){
-      const owlsEff = owlsPer100Acres * (acres/100.0);
-      const perOwlPerWeek = 2.5; // midpoint 1–4
-      const owlRemoval = owlsEff * perOwlPerWeek * 52.0 * Math.max(0, Math.min(1, density));
-      const afterTot = nextJf + nextJm + nextSf + nextSm + nextAf + nextAm;
-      if (afterTot > 0 && owlRemoval > 0){
-        const frac = Math.min(1.0, owlRemoval / afterTot);
-        const k = 1 - frac;
-        removed = afterTot - afterTot * k;
-        nextJf*=k; nextJm*=k; nextSf*=k; nextSm*=k; nextAf*=k; nextAm*=k;
-      }
+  let removed = 0;
+  if (owlsOn){
+    const owlsEff = OWLS_PER_100_ACRES * (acres/100.0);
+    const owlRemoval = spec.owlEffectFactor * owlsEff * PREDATION_PER_OWL_PER_WEEK * 52.0 * Math.max(0, Math.min(1, density));
+    const afterTot = nextJf + nextJm + nextSf + nextSm + nextAf + nextAm;
+    if (afterTot > 0 && owlRemoval > 0){
+      const frac = Math.min(1.0, owlRemoval / afterTot);
+      const k = 1 - frac;
+      removed = afterTot - afterTot * k;
+      nextJf*=k; nextJm*=k; nextSf*=k; nextSm*=k; nextAf*=k; nextAm*=k;
     }
-    return { P:[[nextJf,nextJm],[nextSf,nextSm],[nextAf,nextAm]], removed };
+  }
+  return { P:[[nextJf,nextJm],[nextSf,nextSm],[nextAf,nextAm]], removed };
+}
+
+function damagesForSpecies(spec, acres, level, isTreated, factors){
+  const fYield = factors ? factors.yieldFactor : 1.0;
+  const fNon   = factors ? factors.nonYieldFactor : 1.0;
+
+  const baseRev = acres * spec.yieldLbPerAcre * spec.pricePerLb;
+  const baseRate = isTreated ? spec.lossAfterTreat : spec.lossRate[level];
+  const lossRateAdj = baseRate * fYield;
+  const lossOfCrop  = baseRev * lossRateAdj;
+
+  const baseMult = isTreated ? 1.0 : spec.sevMult[level];
+  let drip  = spec.dripPerAcre    * baseMult * acres;
+  let cropD = spec.cropDmgPerAcre * baseMult * acres;
+  let other = spec.otherPerAcre   * baseMult * acres;
+
+  if (isTreated){
+    drip  *= spec.maintMultiplierAfterTreat;
+    cropD *= spec.maintMultiplierAfterTreat;
+    other *= spec.maintMultiplierAfterTreat;
   }
 
-  const sumAll = P => P[0][0]+P[0][1]+P[1][0]+P[1][1]+P[2][0]+P[2][1];
+  drip  *= fNon;
+  cropD *= fNon;
+  other *= fNon;
 
-  function initialize(acres, level){
-    const totalInit = basePer10(level) * (acres/10.0);
-    const Af = totalInit * birthFracFemale;
-    const Am = totalInit * (1.0 - birthFracFemale);
-    return { N:[[0,0],[0,0],[Af,Am]], T:[[0,0],[0,0],[Af,Am]] };
-  }
+  return { lossOfCrop, drip, cropD, other, total: lossOfCrop + drip + cropD + other };
+}
 
-  // Compute damages; optional factors = {yieldFactor, nonYieldFactor}
-  function damages(acres, level, isTreated, factors){
-    const fYield = factors ? factors.yieldFactor : 1.0;
-    const fNon   = factors ? factors.nonYieldFactor : 1.0;
+function projectAll({ acres, level, owlsOn, activeIds }){
+  // Per-species baseline (owls OFF) & owl (ON)
+  const perSpecies = {};
+  let agg = {
+    natPA_off:0, trtPA_off:0, natPA_on:0, trtPA_on:0,
+    natRemovedSum:0, trtRemovedSum:0,
+    dN_base:{lossOfCrop:0,drip:0,cropD:0,other:0,total:0},
+    dT_base:{lossOfCrop:0,drip:0,cropD:0,other:0,total:0},
+    dN_owl: {lossOfCrop:0,drip:0,cropD:0,other:0,total:0},
+    dT_owl: {lossOfCrop:0,drip:0,cropD:0,other:0,total:0},
+  };
 
-    const baseRev = acres * yieldLbPerAcre * pricePerLb;
-    const baseRate = isTreated ? lossAfterTreat : lossRate(level);
-    const lossRateAdj = baseRate * fYield;
-    const lossOfCrop = baseRev * lossRateAdj;
+  activeIds.forEach(id=>{
+    const spec = SPECIES[id];
 
-    // non-yield bases
-    const baseMult = isTreated ? 1.0 : sevMult(level);
-    let drip  = dripPerAcre_base    * baseMult * acres;
-    let cropD = cropDmgPerAcre_base * baseMult * acres;
-    let other = otherPerAcre_base   * baseMult * acres;
+    // init
+    const N0 = initializeSpecies(spec, acres, level);
+    const T0 = cloneP(N0);
 
-    if (isTreated){
-      drip  *= maintMultiplierAfterTreat;
-      cropD *= maintMultiplierAfterTreat;
-      other *= maintMultiplierAfterTreat;
-    }
-
-    drip  *= fNon;
-    cropD *= fNon;
-    other *= fNon;
-
-    return { lossOfCrop, drip, cropD, other, total: lossOfCrop + drip + cropD + other };
-  }
-
-  // Project both OFF and ON; return whichever matches owlsOn, plus deltas
-  function project({ acres, level, owlsOn }){
-    const { N, T } = initialize(acres, level);
-
-    // --- Baseline (owls OFF)
-    const N_off = annualStep(N, acres, false);
-    const T_off = annualStep(T, acres, false);
-    const T_off_after = [[...T_off.P[0]],[...T_off.P[1]],[...T_off.P[2]]];
-    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T_off_after[a][s] *= surviveAnnual;
+    // OFF
+    const N_off = annualStepSpecies(spec, N0, acres, false);
+    const T_off = annualStepSpecies(spec, T0, acres, false);
+    const T_off_after = cloneP(T_off.P);
+    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T_off_after[a][s] *= SURVIVE_ANNUAL;
 
     const natPA_off = sumAll(N_off.P)/acres;
     const trtPA_off = sumAll(T_off_after)/acres;
-    const dN_base = damages(acres, level, false, null);
-    const dT_base = damages(acres, level, true , null);
 
-    // --- With owls (owls ON)
-    const N_on  = annualStep(N, acres, true);
-    const T_on  = annualStep(T, acres, true);
-    const T_on_after = [[...T_on.P[0]],[...T_on.P[1]],[...T_on.P[2]]];
-    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T_on_after[a][s] *= surviveAnnual;
+    const dN_base = damagesForSpecies(spec, acres, level, false, null);
+    const dT_base = damagesForSpecies(spec, acres, level, true , null);
+
+    // ON
+    const N_on = annualStepSpecies(spec, N0, acres, true);
+    const T_on = annualStepSpecies(spec, T0, acres, true);
+    const T_on_after = cloneP(T_on.P);
+    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T_on_after[a][s] *= SURVIVE_ANNUAL;
 
     const natPA_on = sumAll(N_on.P)/acres;
     const trtPA_on = sumAll(T_on_after)/acres;
 
-    // population reduction fractions
-    const eps=1e-9;
+    const eps = 1e-9;
     const rN = Math.max(0, (natPA_off - natPA_on)/Math.max(eps, natPA_off));
     const rT = Math.max(0, (trtPA_off - trtPA_on)/Math.max(eps, trtPA_off));
-    const rHatN = Math.min(1, gamma * rN);
-    const rHatT = Math.min(1, gamma * rT);
+    const rHatN = Math.min(1, GAMMA * rN);
+    const rHatT = Math.min(1, GAMMA * rT);
 
-    const factorsN = { yieldFactor: 1 - betaYield*rHatN, nonYieldFactor: 1 - betaNon*rHatN };
-    const factorsT = { yieldFactor: 1 - betaYield*rHatT, nonYieldFactor: 1 - betaNon*rHatT };
+    const factorsN = { yieldFactor: 1 - BETA_YIELD*rHatN, nonYieldFactor: 1 - BETA_NON*rHatN };
+    const factorsT = { yieldFactor: 1 - BETA_YIELD*rHatT, nonYieldFactor: 1 - BETA_NON*rHatT };
 
-    const dN_owl = damages(acres, level, false, factorsN);
-    const dT_owl = damages(acres, level, true , factorsT);
+    const dN_owl = damagesForSpecies(spec, acres, level, false, factorsN);
+    const dT_owl = damagesForSpecies(spec, acres, level, true , factorsT);
 
-    // choose which to display based on current toggle
-    const natPerAcre = owlsOn ? natPA_on : natPA_off;
-    const trtPerAcre = owlsOn ? trtPA_on : trtPA_off;
-    const dN = owlsOn ? dN_owl : dN_base;
-    const dT = owlsOn ? dT_owl : dT_base;
+    // aggregate
+    agg.natPA_off += natPA_off;
+    agg.trtPA_off += trtPA_off;
+    agg.natPA_on  += natPA_on;
+    agg.trtPA_on  += trtPA_on;
 
-    const natRemoved = owlsOn ? Math.round(N_on.removed) : 0;
-    const trtRemoved = owlsOn ? Math.round(T_on.removed) : 0;
+    agg.natRemovedSum += Math.round(N_on.removed);
+    agg.trtRemovedSum += Math.round(T_on.removed);
 
-    // deltas for UI (only meaningful when owlsOn)
-    const natDelta = owlsOn ? (dN_base.total - dN_owl.total) : 0;
-    const trtDelta = owlsOn ? (dT_base.total - dT_owl.total) : 0;
-    const natDeltaPct = owlsOn && dN_base.total>0 ? (natDelta/dN_base.total) : 0;
-    const trtDeltaPct = owlsOn && dT_base.total>0 ? (trtDelta/dT_base.total) : 0;
+    for(const k of ["lossOfCrop","drip","cropD","other","total"]){
+      agg.dN_base[k]+=dN_base[k];
+      agg.dT_base[k]+=dT_base[k];
+      agg.dN_owl[k] +=dN_owl[k];
+      agg.dT_owl[k] +=dT_owl[k];
+    }
 
-    const owlPerAcreDropN = owlsOn ? (natPA_off - natPA_on) : 0;
-    const owlPerAcreDropT = owlsOn ? (trtPA_off - trtPA_on) : 0;
-
-    return {
-      natPerAcre, trtPerAcre,
-      dN, dT,
-      natRemoved, trtRemoved,
-      owlPerAcreDropN, owlPerAcreDropT,
-      natDelta, trtDelta, natDeltaPct, trtDeltaPct
+    perSpecies[id] = {
+      name: spec.name,
+      natPA_off, natPA_on, trtPA_off, trtPA_on
     };
-  }
+  });
 
-  return { project };
-})();
+  // choose display based on toggle
+  const natPerAcre = owlsOn ? agg.natPA_on : agg.natPA_off;
+  const trtPerAcre = owlsOn ? agg.trtPA_on : agg.trtPA_off;
 
-/* ------------------------------ UI Wiring ------------------------------ */
+  const dN = owlsOn ? agg.dN_owl : agg.dN_base;
+  const dT = owlsOn ? agg.dT_owl : agg.dT_base;
+
+  const natDelta = owlsOn ? (agg.dN_base.total - agg.dN_owl.total) : 0;
+  const trtDelta = owlsOn ? (agg.dT_base.total - agg.dT_owl.total) : 0;
+  const natDeltaPct = owlsOn && agg.dN_base.total>0 ? (natDelta/agg.dN_base.total) : 0;
+  const trtDeltaPct = owlsOn && agg.dT_base.total>0 ? (trtDelta/agg.dT_base.total) : 0;
+
+  const owlPerAcreDropN = owlsOn ? (agg.natPA_off - agg.natPA_on) : 0;
+  const owlPerAcreDropT = owlsOn ? (agg.trtPA_off - agg.trtPA_on) : 0;
+
+  return {
+    natPerAcre, trtPerAcre, dN, dT,
+    natRemoved: owlsOn ? agg.natRemovedSum : 0,
+    trtRemoved: owlsOn ? agg.trtRemovedSum : 0,
+    owlPerAcreDropN, owlPerAcreDropT,
+    natDelta, trtDelta, natDeltaPct, trtDeltaPct,
+    perSpecies
+  };
+}
+
+/* ------------------------------ UI wiring ------------------------------ */
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 
 const acreRange = $("#acres");
 const acreBubble = $("#acreBubble");
 const owlsChk = $("#owls");
-
+const speciesBtns = $$(".speciesbtn");
 const infButtons = $$(".infbtn");
 
 const natTotalEl = $("#natTotal");
@@ -401,6 +472,14 @@ const natPerAcreEl = $("#natPerAcre");
 const trtPerAcreEl = $("#trtPerAcre");
 const natOwlEl = $("#natOwl");
 const trtOwlEl = $("#trtOwl");
+const natPerSpeciesEl = $("#natPerSpecies");
+const trtPerSpeciesEl = $("#trtPerSpecies");
+
+// state: active species
+function getActiveSpecies(){
+  const ids = speciesBtns.filter(b => b.classList.contains("active")).map(b => b.dataset.id);
+  return ids.length ? ids : ["gopher"]; // guard: ensure at least gopher
+}
 
 function fmtMoney(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
 function fmtPct(x){ return (x*100).toFixed(1) + "%"; }
@@ -418,17 +497,27 @@ function activeLevel(){
   return parseInt(btn.dataset.level,10);
 }
 
+function perSpeciesLine(perSpecies, useOwls, natural){
+  // natural? pick natPA_*; else trtPA_*
+  const key = natural ? (useOwls ? "natPA_on" : "natPA_off")
+                      : (useOwls ? "trtPA_on" : "trtPA_off");
+  const parts = Object.values(perSpecies).map(sp => `${sp.name.split(" ")[0]} ${sp[key].toFixed(1)}/ac`);
+  return parts.length ? `By species: ${parts.join(" • ")}` : "—";
+}
+
 function render(){
   const acres = +acreRange.value;
   const level = activeLevel();
   const owlsOn = owlsChk.checked;
+  const activeIds = getActiveSpecies();
 
   const {
     natPerAcre, trtPerAcre, dN, dT,
     natRemoved, trtRemoved,
     owlPerAcreDropN, owlPerAcreDropT,
-    natDelta, trtDelta, natDeltaPct, trtDeltaPct
-  } = Model.project({ acres, level, owlsOn });
+    natDelta, trtDelta, natDeltaPct, trtDeltaPct,
+    perSpecies
+  } = projectAll({ acres, level, owlsOn, activeIds });
 
   // Natural
   natTotalEl.textContent = fmtMoney(dN.total);
@@ -440,6 +529,7 @@ function render(){
     <tr><td>Total</td><td>${fmtMoney(dN.total)}</td></tr>
   `;
   natPerAcreEl.textContent = natPerAcre.toFixed(1);
+  natPerSpeciesEl.textContent = perSpeciesLine(perSpecies, owlsOn, /*natural=*/true);
   natOwlEl.textContent = owlsOn
     ? `Owl effect: −${owlPerAcreDropN.toFixed(1)}/acre · Removal est.: ${Math.round(natRemoved).toLocaleString()} / yr · Damage change: −${fmtMoney(natDelta)} (−${fmtPct(natDeltaPct)})`
     : `Owl effect: 0.0/acre · Removal est.: 0 / yr · Damage change: $0 (0%)`;
@@ -454,15 +544,16 @@ function render(){
     <tr><td>Total</td><td>${fmtMoney(dT.total)}</td></tr>
   `;
   trtPerAcreEl.textContent = trtPerAcre.toFixed(1);
+  trtPerSpeciesEl.textContent = perSpeciesLine(perSpecies, owlsOn, /*natural=*/false);
   trtOwlEl.textContent = owlsOn
     ? `Owl effect: −${owlPerAcreDropT.toFixed(1)}/acre · Removal est.: ${Math.round(trtRemoved).toLocaleString()} / yr · Damage change: −${fmtMoney(trtDelta)} (−${fmtPct(trtDeltaPct)})`
     : `Owl effect: 0.0/acre · Removal est.: 0 / yr · Damage change: $0 (0%)`;
 }
 
-// Events
-infButtons.forEach(btn=>{
+/* events */
+$$(".infbtn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
-    infButtons.forEach(b=>{
+    $$(".infbtn").forEach(b=>{
       const on = (b===btn);
       b.classList.toggle("active", on);
       b.setAttribute("aria-selected", on ? "true" : "false");
@@ -470,10 +561,28 @@ infButtons.forEach(btn=>{
     render();
   });
 });
-acreRange.addEventListener("input", ()=>{ setAcreBubble(); render(); });
-owlsChk.addEventListener("change", render);
 
-// Initial
+speciesBtns.forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const isActive = btn.classList.contains("active");
+    // toggle state
+    btn.classList.toggle("active", !isActive);
+    btn.classList.toggle("inactive", isActive);
+    btn.setAttribute("aria-pressed", (!isActive).toString());
+    // guard: ensure at least one species is active
+    const anyOn = speciesBtns.some(b=>b.classList.contains("active"));
+    if (!anyOn){
+      const g = speciesBtns.find(b=>b.dataset.id==="gopher");
+      g.classList.add("active"); g.classList.remove("inactive"); g.setAttribute("aria-pressed","true");
+    }
+    render();
+  });
+});
+
+acreRange.addEventListener("input", ()=>{ setAcreBubble(); render(); });
+$("#owls").addEventListener("change", render);
+
+// initial
 window.addEventListener("load", ()=>{
   setAcreBubble();
   render();
