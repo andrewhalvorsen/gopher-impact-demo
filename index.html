@@ -26,7 +26,6 @@
 
   .lead{ display:flex; flex-direction:column; gap:8px; }
   .lead h1{ margin:0; font-size:28px; line-height:1.15; letter-spacing:-0.01em; }
-  .lead .sub{ font-size:14px; opacity:.85; }
 
   .group{ display:flex; flex-direction:column; gap:12px; }
   .label{ font-weight:800; font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
@@ -103,10 +102,6 @@
   .tbl td:last-child{ text-align:right; font-variant-numeric:tabular-nums; }
   .tbl tr:last-child td{ border-bottom:none; font-weight:800; }
 
-  .foot{ margin-top:10px; color:#6b7280; font-size:12px; }
-  .footSmall{ margin-top:6px; color:#6b7280; font-size:12px; }
-  .owlNote{ margin-top:6px; color:#6b7280; font-size:12px; }
-
   @media (max-width:980px){
     .wrap{ grid-template-columns:1fr; }
     .grid{ grid-template-columns:1fr; }
@@ -119,7 +114,6 @@
     <section class="panel left" aria-label="Controls">
       <div class="lead">
         <h1>See how much rodents cost you</h1>
-        <div class="sub">Toggle rodent types, set severity & acres. Results update instantly.</div>
       </div>
 
       <!-- Rodent Types (multi-select) -->
@@ -128,7 +122,7 @@
         <div class="segmented species" role="group" aria-label="Rodent Types">
           <button type="button" class="speciesbtn active" data-id="gopher" aria-pressed="true">Gophers</button>
           <button type="button" class="speciesbtn inactive" data-id="rat" aria-pressed="false">Rats</button>
-          <button type="button" class="speciesbtn inactive" data-id="squirrel" aria-pressed="false">Ground&nbsp;Squirrels</button>
+          <button type="button" class="speciesbtn inactive" data-id="squirrel" aria-pressed="false">Squirrels</button>
         </div>
       </div>
 
@@ -178,11 +172,6 @@
           <table class="tbl" aria-label="Natural damage breakdown">
             <tbody id="natBreak"></tbody>
           </table>
-          <div class="foot">
-            Population after 1 year: <strong id="natPerAcre">—</strong> per acre
-          </div>
-          <div class="footSmall" id="natPerSpecies">—</div>
-          <div class="owlNote" id="natOwl">Owl effect: —/acre · Removal est.: —/yr · Damage change: —</div>
         </div>
 
         <!-- Treated -->
@@ -195,15 +184,7 @@
           <table class="tbl" aria-label="Treated damage breakdown">
             <tbody id="trtBreak"></tbody>
           </table>
-          <div class="foot">
-            Population after 1 year: <strong id="trtPerAcre">—</strong> per acre
-          </div>
-          <div class="footSmall" id="trtPerSpecies">—</div>
-          <div class="owlNote" id="trtOwl">Owl effect: —/acre · Removal est.: —/yr · Damage change: —</div>
         </div>
-      </div>
-      <div class="owlNote" style="margin-top:10px;">
-        Note: Owl Boxes now have stronger impact (post-reproduction density, higher predation rate, amplified damage response).
       </div>
     </section>
   </div>
@@ -224,7 +205,7 @@ const SPECIES = {
   },
   rat: {
     name: "Rats",
-    owlEffectFactor: 1.0, // adjust with your rat constants if needed
+    owlEffectFactor: 1.0,
     K_per_acre: 80.0, litterMean: 6.0, birthFracFemale: 0.70, breederFrac: 0.80, fertSlope: 3.5,
     survJ: 0.45, survS: 0.65, survA: 0.82, agingA: 0.08,
     basePer10: {1:20.0, 2:40.0, 3:70.0},
@@ -234,8 +215,8 @@ const SPECIES = {
     sevMult: {1:0.8, 2:1.0, 3:1.2}, maintMultiplierAfterTreat: 0.20,
   },
   squirrel: {
-    name: "Ground Squirrels",
-    owlEffectFactor: 1.0, // adjust with your squirrel constants if needed
+    name: "Squirrels",
+    owlEffectFactor: 1.0,
     K_per_acre: 80.0, litterMean: 6.0, birthFracFemale: 0.70, breederFrac: 0.80, fertSlope: 3.5,
     survJ: 0.45, survS: 0.65, survA: 0.82, agingA: 0.08,
     basePer10: {1:20.0, 2:40.0, 3:70.0},
@@ -302,8 +283,8 @@ function annualStep(spec, P, acres, owlsOn){
     const densityAfter = K_total > 0 ? Math.min(1, afterTot / K_total) : 0;
 
     const owlRemoval =
-      OWL_STRENGTH *                  // stronger owls
-      spec.owlEffectFactor *          // per-species scaling
+      OWL_STRENGTH *
+      spec.owlEffectFactor *
       owlsEff *
       PREDATION_PER_OWL_PER_WEEK *
       52.0 *
@@ -444,15 +425,8 @@ const natTotalEl = $("#natTotal");
 const trtTotalEl = $("#trtTotal");
 const natBreakEl = $("#natBreak");
 const trtBreakEl = $("#trtBreak");
-const natPerAcreEl = $("#natPerAcre");
-const trtPerAcreEl = $("#trtPerAcre");
-const natOwlEl = $("#natOwl");
-const trtOwlEl = $("#trtOwl");
-const natPerSpeciesEl = $("#natPerSpecies");
-const trtPerSpeciesEl = $("#trtPerSpecies");
 
 function fmtMoney(n){ return "$" + Math.round(n).toLocaleString("en-US"); }
-function fmtPct(x){ return (x*100).toFixed(1) + "%"; }
 
 function setAcreBubble(){
   const min = +acreRange.min, max = +acreRange.max, val = +acreRange.value;
@@ -472,26 +446,13 @@ function getActiveSpecies(){
   return ids.length ? ids : ["gopher"]; // always at least one
 }
 
-function perSpeciesLine(perSpecies, useOwls, natural){
-  const key = natural ? (useOwls ? "natPA_on" : "natPA_off")
-                      : (useOwls ? "trtPA_on" : "trtPA_off");
-  const parts = Object.values(perSpecies).map(sp => `${sp.name.split(" ")[0]} ${sp[key].toFixed(1)}/ac`);
-  return parts.length ? `By species: ${parts.join(" • ")}` : "—";
-}
-
 function render(){
   const acres = +acreRange.value;
   const level = activeLevel();
   const owlsOn = owlsChk.checked;
   const activeIds = getActiveSpecies();
 
-  const {
-    natPerAcre, trtPerAcre, dN, dT,
-    natRemoved, trtRemoved,
-    owlPerAcreDropN, owlPerAcreDropT,
-    natDelta, trtDelta, natDeltaPct, trtDeltaPct,
-    perSpecies
-  } = projectAll({ acres, level, owlsOn, activeIds });
+  const { dN, dT } = projectAll({ acres, level, owlsOn, activeIds });
 
   // Natural
   natTotalEl.textContent = fmtMoney(dN.total);
@@ -502,11 +463,6 @@ function render(){
     <tr><td>Other O&amp;M</td><td>${fmtMoney(dN.other)}</td></tr>
     <tr><td>Total</td><td>${fmtMoney(dN.total)}</td></tr>
   `;
-  natPerAcreEl.textContent = natPerAcre.toFixed(1);
-  natPerSpeciesEl.textContent = perSpeciesLine(perSpecies, owlsOn, true);
-  natOwlEl.textContent = owlsOn
-    ? `Owl effect: −${owlPerAcreDropN.toFixed(1)}/acre · Removal est.: ${Math.round(natRemoved).toLocaleString()} / yr · Damage change: −${fmtMoney(natDelta)} (−${fmtPct(natDeltaPct)})`
-    : `Owl effect: 0.0/acre · Removal est.: 0 / yr · Damage change: $0 (0%)`;
 
   // Treated
   trtTotalEl.textContent = fmtMoney(dT.total);
@@ -517,11 +473,6 @@ function render(){
     <tr><td>Other O&amp;M</td><td>${fmtMoney(dT.other)}</td></tr>
     <tr><td>Total</td><td>${fmtMoney(dT.total)}</td></tr>
   `;
-  trtPerAcreEl.textContent = trtPerAcre.toFixed(1);
-  trtPerSpeciesEl.textContent = perSpeciesLine(perSpecies, owlsOn, false);
-  trtOwlEl.textContent = owlsOn
-    ? `Owl effect: −${owlPerAcreDropT.toFixed(1)}/acre · Removal est.: ${Math.round(trtRemoved).toLocaleString()} / yr · Damage change: −${fmtMoney(trtDelta)} (−${fmtPct(trtDeltaPct)})`
-    : `Owl effect: 0.0/acre · Removal est.: 0 / yr · Damage change: $0 (0%)`;
 }
 
 /* events */
