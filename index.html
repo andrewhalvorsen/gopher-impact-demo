@@ -203,7 +203,7 @@
         </div>
       </div>
       <div class="owlNote" style="margin-top:10px;">
-        Note: Owl Boxes reduce damages in proportion to the population reduction they cause (yield lightly, non-yield more).
+        Note: Owl Boxes now have stronger impact (post-reproduction density, higher predation rate, amplified damage response).
       </div>
     </section>
   </div>
@@ -224,8 +224,7 @@ const SPECIES = {
   },
   rat: {
     name: "Rats",
-    owlEffectFactor: 1.0, // update if your rat model differs
-    // placeholder: copy gopher until you paste rat constants
+    owlEffectFactor: 1.0, // adjust with your rat constants if needed
     K_per_acre: 80.0, litterMean: 6.0, birthFracFemale: 0.70, breederFrac: 0.80, fertSlope: 3.5,
     survJ: 0.45, survS: 0.65, survA: 0.82, agingA: 0.08,
     basePer10: {1:20.0, 2:40.0, 3:70.0},
@@ -236,8 +235,7 @@ const SPECIES = {
   },
   squirrel: {
     name: "Ground Squirrels",
-    owlEffectFactor: 1.0, // update if your squirrel model differs
-    // placeholder: copy gopher until you paste squirrel constants
+    owlEffectFactor: 1.0, // adjust with your squirrel constants if needed
     K_per_acre: 80.0, litterMean: 6.0, birthFracFemale: 0.70, breederFrac: 0.80, fertSlope: 3.5,
     survJ: 0.45, survS: 0.65, survA: 0.82, agingA: 0.08,
     basePer10: {1:20.0, 2:40.0, 3:70.0},
@@ -252,12 +250,13 @@ const SPECIES = {
 const PASSES_PER_YEAR = 6, KILL_RATE_PER_PASS = 0.25;
 const SURVIVE_ANNUAL = Math.pow(1 - KILL_RATE_PER_PASS, PASSES_PER_YEAR); // (0.75)^6
 
-// Owl predation
+// Owl predation (BOOSTED)
 const OWLS_PER_100_ACRES = 1.9;
-const PREDATION_PER_OWL_PER_WEEK = 2.5; // midpoint 1–4
+const PREDATION_PER_OWL_PER_WEEK = 3.5; // was 2.5 → stronger
+const OWL_STRENGTH = 1.8;                // global multiplier for owl impact
 
-// Owl → damage discount tuning
-const GAMMA = 3.0, BETA_YIELD = 0.30, BETA_NON = 0.60;
+// Owl → damage discount tuning (BOOSTED)
+const GAMMA = 4.5, BETA_YIELD = 0.35, BETA_NON = 0.70;
 
 function cloneP(P){ return [[P[0][0],P[0][1]],[P[1][0],P[1][1]],[P[2][0],P[2][1]]]; }
 const sumAll = P => P[0][0]+P[0][1]+P[1][0]+P[1][1]+P[2][0]+P[2][1];
@@ -277,6 +276,7 @@ function annualStep(spec, P, acres, owlsOn){
 
   const fertMult = 1 / (1 + Math.exp(spec.fertSlope * (density - 1.0)));
 
+  // Reproduction & survival (deterministic)
   const litter = spec.litterMean;
   const breeders = Af * spec.breederFrac;
   const births = breeders * litter * fertMult;
@@ -290,14 +290,25 @@ function annualStep(spec, P, acres, owlsOn){
   let nextAf = Sf * spec.survS + Af * spec.survA;
   let nextAm = Sm * spec.survS + Am * spec.survA;
 
+  // Aging
   nextAf = Math.max(0, nextAf - Af * spec.agingA);
   nextAm = Math.max(0, nextAm - Am * spec.agingA);
 
+  // Owl predation (BOOSTED): compute density AFTER reproduction/survival
   let removed = 0;
   if (owlsOn){
     const owlsEff = OWLS_PER_100_ACRES * (acres/100.0);
-    const owlRemoval = spec.owlEffectFactor * owlsEff * PREDATION_PER_OWL_PER_WEEK * 52.0 * Math.max(0, Math.min(1, density));
     const afterTot = nextJf + nextJm + nextSf + nextSm + nextAf + nextAm;
+    const densityAfter = K_total > 0 ? Math.min(1, afterTot / K_total) : 0;
+
+    const owlRemoval =
+      OWL_STRENGTH *                  // stronger owls
+      spec.owlEffectFactor *          // per-species scaling
+      owlsEff *
+      PREDATION_PER_OWL_PER_WEEK *
+      52.0 *
+      densityAfter;
+
     if (afterTot > 0 && owlRemoval > 0){
       const frac = Math.min(1.0, owlRemoval / afterTot);
       const k = 1 - frac;
