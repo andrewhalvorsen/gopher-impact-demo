@@ -3,67 +3,69 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Smokin’ Burrow – Rodent Impact Estimator (1-Year)</title>
+<title>Smokin’ Burrow – Gopher Impact (1-Year)</title>
 <style>
   :root{ --yellow:#f4cf2f; --ink:#0f172a; --border:#e5e7eb; --bg:#f8fafc; --card:#ffffff; --radius:20px; --shadow:0 18px 40px rgba(0,0,0,.08); }
   *{box-sizing:border-box}
   body{ margin:0; background:var(--bg); color:var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
-  .wrap{ max-width:1200px; margin:48px auto; padding:0 20px; display:grid; grid-template-columns:440px 1fr; gap:28px; }
+  .wrap{ max-width:1100px; margin:48px auto; padding:0 20px; display:grid; grid-template-columns:420px 1fr; gap:28px; }
   .panel{ border-radius:var(--radius); box-shadow:var(--shadow); }
   .left{ background:var(--yellow); padding:32px 26px; display:flex; flex-direction:column; gap:26px; }
   .right{ background:var(--card); padding:28px 26px; }
-  .lead h1{ margin:0; font-size:28px; line-height:1.15; letter-spacing:-0.01em; }
+
+  .lead h1{ margin:0; font-size:26px; line-height:1.15; letter-spacing:-0.01em; }
   .group{ display:flex; flex-direction:column; gap:12px; }
   .label{ font-weight:800; font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
+
   .segmented{ display:grid; grid-template-columns: repeat(3, 1fr); width:100%; padding:6px; gap:0; border-radius:14px; background:rgba(255,255,255,.50); border:2px solid rgba(0,0,0,.06); }
   .segmented button{ appearance:none; border:0; cursor:pointer; width:100%; padding:14px 0; font-weight:800; font-size:15px; color:#0f172a; background:transparent; border-radius:10px; border:2px solid transparent; transition:background .12s, transform .06s, box-shadow .12s, opacity .12s; }
   .segmented button:hover{ background:rgba(255,255,255,.35); }
   .segmented button:active{ transform:translateY(1px); }
   .segmented button.active{ background:#fff; border-color:rgba(0,0,0,.06); box-shadow:0 8px 20px rgba(0,0,0,.10); }
   .segmented button.inactive{ opacity:.55; }
+
   .slider-wrap{ position:relative; padding-top:14px; }
   input[type="range"]{ -webkit-appearance:none; width:100%; height:8px; border-radius:999px; background:#fff; outline:none; border:2px solid rgba(0,0,0,.07); }
   input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:#fff; border:2px solid rgba(0,0,0,.12); box-shadow:0 6px 18px rgba(0,0,0,.12); cursor:pointer; }
   input[type="range"]::-moz-range-thumb{ width:26px; height:26px; border:none; border-radius:50%; background:#fff; box-shadow:0 6px 18px rgba(0,0,0,.12); cursor:pointer; }
   .bubble{ position:absolute; top:-2px; transform:translate(-50%,-100%); background:#111827; color:#fff; padding:6px 10px; font-size:12px; border-radius:10px; box-shadow:0 10px 22px rgba(0,0,0,.14); white-space:nowrap; }
   .bubble:after{ content:""; position:absolute; left:50%; bottom:-6px; transform:translateX(-50%); border-left:6px solid transparent; border-right:6px solid transparent; border-top:6px solid #111827; }
+
   .switch{ display:flex; align-items:center; gap:12px; font-weight:700; }
   .switch input{ display:none; }
   .toggle{ width:54px; height:30px; border-radius:999px; background:rgba(0,0,0,.25); position:relative; cursor:pointer; }
   .toggle:after{ content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; border-radius:50%; background:#fff; box-shadow:0 6px 18px rgba(0,0,0,.18); transition:transform .18s ease; }
   .switch input:checked + .toggle{ background:#16a34a; }
   .switch input:checked + .toggle:after{ transform:translateX(24px); }
-  .headerline{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:10px; }
+
+  .disclaimer{ margin-top:8px; font-size:12px; line-height:1.4; color:#111827; opacity:.9; }
+
+  .headerline{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
   .title{ font-size:16px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#374151; }
+
   .grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-  .card{ border:1px solid var(--border); border-radius:16px; padding:18px; }
+  .card{ border:1px solid var(--border); border-radius:16px; padding:16px; background:#fff; }
   .card h3{ margin:0 0 8px; font-size:13px; letter-spacing:.06em; color:#6b7280; text-transform:uppercase; }
-  .metric{ display:flex; align-items:baseline; gap:10px; margin:12px 0 8px; }
-  .num{ font-size:40px; font-weight:900; letter-spacing:-0.02em; }
+  .metric{ display:flex; align-items:baseline; gap:10px; margin:10px 0 6px; }
+  .num{ font-size:34px; font-weight:900; letter-spacing:-0.02em; }
   .badge{ padding:4px 10px; border-radius:999px; background:#f3f4f6; font-size:12px; font-weight:800; color:#374151; }
+
   .tbl{ width:100%; border-collapse:collapse; font-size:14px; }
-  .tbl td{ padding:10px 0; border-bottom:1px dashed var(--border); }
+  .tbl td{ padding:8px 0; border-bottom:1px dashed var(--border); }
   .tbl td:last-child{ text-align:right; font-variant-numeric:tabular-nums; }
   .tbl tr:last-child td{ border-bottom:none; font-weight:800; }
-  @media (max-width:980px){ .wrap{ grid-template-columns:1fr; } .grid{ grid-template-columns:1fr; } }
+
+  @media (max-width:1024px){ .wrap{ grid-template-columns:1fr; } .grid{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
   <div class="wrap">
-    <!-- LEFT -->
+    <!-- LEFT / CONTROLS -->
     <section class="panel left" aria-label="Controls">
-      <div class="lead"><h1>See how much rodents cost you</h1></div>
+      <div class="lead"><h1>See how much gophers cost you</h1></div>
 
+      <!-- Infestation -->
       <div class="group">
-        <div class="label">Rodent Types</div>
-        <div class="segmented species" role="group" aria-label="Rodent Types">
-          <button type="button" class="speciesbtn active" data-id="gopher" aria-pressed="true">Gophers</button>
-          <button type="button" class="speciesbtn inactive" data-id="rat" aria-pressed="false">Rats</button>
-          <button type="button" class="speciesbtn inactive" data-id="squirrel" aria-pressed="false">Squirrels</button>
-        </div>
-      </div>
-
-      <div class="group" id="infestationGroup">
         <div class="label">Infestation Level</div>
         <div class="segmented" role="tablist" aria-label="Infestation Level">
           <button type="button" class="infbtn" data-level="1" role="tab" aria-selected="false">Mild</button>
@@ -72,6 +74,7 @@
         </div>
       </div>
 
+      <!-- Acres -->
       <div class="group">
         <div class="label">Acres</div>
         <div class="slider-wrap">
@@ -80,208 +83,50 @@
         </div>
       </div>
 
+      <!-- Owl Boxes -->
       <div class="group">
         <label class="switch">
           <input id="owls" type="checkbox" aria-label="Owl Boxes" />
           <span class="toggle" aria-hidden="true"></span>
           <span>Owl Boxes</span>
         </label>
+        <!-- NEW DISCLAIMER -->
+        <p class="disclaimer">
+          *Disclaimer: Estimates are based on research and field data. Results may vary and are not guaranteed.
+        </p>
       </div>
     </section>
 
-    <!-- RIGHT -->
+    <!-- RIGHT / RESULTS -->
     <section class="panel right" aria-live="polite" aria-atomic="true">
       <div class="headerline"><div class="title">1-Year Impact (Almonds)</div></div>
 
       <div class="grid">
-        <div class="card" id="naturalCard">
-          <h3>Natural</h3>
-          <div class="metric">
-            <div class="num" id="natTotal">$—</div><span class="badge">Total Damage (1 year)</span>
-          </div>
-          <table class="tbl" aria-label="Natural damage breakdown"><tbody id="natBreak"></tbody></table>
+        <!-- NATURAL -->
+        <div class="card">
+          <h3>Natural (Untreated)</h3>
+          <div class="metric"><div class="num" id="nat_total">$—</div><span class="badge">Total Damage</span></div>
+          <table class="tbl"><tbody id="nat_break"></tbody></table>
         </div>
 
-        <div class="card" id="treatedCard">
+        <!-- TREATED -->
+        <div class="card">
           <h3>Treated</h3>
-          <div class="metric">
-            <div class="num" id="trtTotal">$—</div><span class="badge">Total Damage (1 year)</span>
-          </div>
-          <table class="tbl" aria-label="Treated damage breakdown"><tbody id="trtBreak"></tbody></table>
+          <div class="metric"><div class="num" id="trt_total">$—</div><span class="badge">Total Damage</span></div>
+          <table class="tbl"><tbody id="trt_break"></tbody></table>
         </div>
       </div>
     </section>
   </div>
 
 <script>
-/* ------------------------------ Model ------------------------------ */
-const SPECIES = {
-  gopher: { name:"Gophers", owlEffectFactor:1.0,
-    K_per_acre:80, litterMean:6, birthFracFemale:.70, breederFrac:.80, fertSlope:3.5,
-    survJ:.45, survS:.65, survA:.82, agingA:.08,
-    basePer10:{1:20,2:40,3:70},
-    pricePerLb:2.50, yieldLbPerAcre:2500,
-    lossRate:{1:.02,2:.04,3:.06}, lossAfterTreat:.01,
-    dripPerAcre:60, cropDmgPerAcre:40, otherPerAcre:70,
-    sevMult:{1:.8,2:1.0,3:1.2}, maintMultiplierAfterTreat:.20 },
-  rat: { name:"Rats", owlEffectFactor:1.0,
-    K_per_acre:80, litterMean:6, birthFracFemale:.70, breederFrac:.80, fertSlope:3.5,
-    survJ:.45, survS:.65, survA:.82, agingA:.08,
-    basePer10:{1:20,2:40,3:70},
-    pricePerLb:2.50, yieldLbPerAcre:2500,
-    lossRate:{1:.02,2:.04,3:.06}, lossAfterTreat:.01,
-    dripPerAcre:60, cropDmgPerAcre:40, otherPerAcre:70,
-    sevMult:{1:.8,2:1.0,3:1.2}, maintMultiplierAfterTreat:.20 },
-  squirrel: { name:"Squirrels", owlEffectFactor:1.0,
-    K_per_acre:80, litterMean:6, birthFracFemale:.70, breederFrac:.80, fertSlope:3.5,
-    survJ:.45, survS:.65, survA:.82, agingA:.08,
-    basePer10:{1:20,2:40,3:70},
-    pricePerLb:2.50, yieldLbPerAcre:2500,
-    lossRate:{1:.02,2:.04,3:.06}, lossAfterTreat:.01,
-    dripPerAcre:60, cropDmgPerAcre:40, otherPerAcre:70,
-    sevMult:{1:.8,2:1.0,3:1.2}, maintMultiplierAfterTreat:.20 },
-};
-
-// CO₂ treatment
-const PASSES_PER_YEAR=6, KILL_RATE_PER_PASS=.25;
-const SURVIVE_ANNUAL=Math.pow(1-KILL_RATE_PER_PASS,PASSES_PER_YEAR); // (0.75)^6
-
-// Owl predation (boosted)
-const OWLS_PER_100_ACRES=1.9;
-const PREDATION_PER_OWL_PER_WEEK=3.5;
-const OWL_STRENGTH=1.8;
-
-// Damage response to owl-driven population drops (boosted)
-const GAMMA=4.5, BETA_YIELD=.35, BETA_NON=.70;
-
-function cloneP(P){return [[P[0][0],P[0][1]],[P[1][0],P[1][1]],[P[2][0],P[2][1]]];}
-const sumAll=P=>P[0][0]+P[0][1]+P[1][0]+P[1][1]+P[2][0]+P[2][1];
-
-function initialize(spec, acres, level){
-  const totalInit=spec.basePer10[level]*(acres/10);
-  const Af=totalInit*spec.birthFracFemale, Am=totalInit*(1-spec.birthFracFemale);
-  return [[0,0],[0,0],[Af,Am]];
-}
-
-function annualStep(spec, P, acres, owlsOn){
-  let [Jf,Jm,Sf,Sm,Af,Am]=[P[0][0],P[0][1],P[1][0],P[1][1],P[2][0],P[2][1]];
-  const K_total=spec.K_per_acre*acres, total=Jf+Jm+Sf+Sm+Af+Am, density=K_total>0?total/K_total:0;
-  const fertMult=1/(1+Math.exp(spec.fertSlope*(density-1)));
-  const litter=spec.litterMean, breeders=Af*spec.breederFrac, births=breeders*litter*fertMult;
-  const pupsF=births*spec.birthFracFemale, pupsM=births*(1-spec.birthFracFemale);
-  let nextJf=pupsF, nextJm=pupsM, nextSf=Jf*spec.survJ, nextSm=Jm*spec.survJ;
-  let nextAf=Sf*spec.survS+Af*spec.survA, nextAm=Sm*spec.survS+Am*spec.survA;
-  nextAf=Math.max(0,nextAf-Af*spec.agingA); nextAm=Math.max(0,nextAm-Am*spec.agingA);
-
-  // Owls after reproduction/survival
-  let removed=0;
-  if(owlsOn){
-    const owlsEff=OWLS_PER_100_ACRES*(acres/100);
-    const afterTot=nextJf+nextJm+nextSf+nextSm+nextAf+nextAm;
-    const densityAfter=K_total>0?Math.min(1,afterTot/K_total):0;
-    const owlRemoval=OWL_STRENGTH*spec.owlEffectFactor*owlsEff*PREDATION_PER_OWL_PER_WEEK*52*densityAfter;
-    if(afterTot>0&&owlRemoval>0){
-      const frac=Math.min(1,owlRemoval/afterTot), k=1-frac;
-      removed=afterTot-afterTot*k;
-      nextJf*=k; nextJm*=k; nextSf*=k; nextSm*=k; nextAf*=k; nextAm*=k;
-    }
-  }
-  return { P:[[nextJf,nextJm],[nextSf,nextSm],[nextAf,nextAm]], removed };
-}
-
-/* >>> Updated damages: Treated now scales with severity <<< */
-function damages(spec, acres, level, isTreated, factors){
-  const fYield = factors ? factors.yieldFactor : 1.0;
-  const fNon   = factors ? factors.nonYieldFactor : 1.0;
-  const sev    = spec.sevMult[level];
-
-  // Yield loss
-  const baseRev = acres * spec.yieldLbPerAcre * spec.pricePerLb;
-  const baseRate = isTreated ? (spec.lossAfterTreat * sev)     // changed: treated scales with severity
-                             :  spec.lossRate[level];
-  const lossOfCrop  = baseRev * (baseRate * fYield);
-
-  // Non-yield damages
-  let mult = sev;                                              // changed: severity always applied
-  let drip  = spec.dripPerAcre    * mult * acres;
-  let cropD = spec.cropDmgPerAcre * mult * acres;
-  let other = spec.otherPerAcre   * mult * acres;
-
-  if (isTreated){
-    const m = spec.maintMultiplierAfterTreat;                  // 20% after treatment
-    drip*=m; cropD*=m; other*=m;
-  }
-
-  drip*=fNon; cropD*=fNon; other*=fNon;
-
-  return { lossOfCrop, drip, cropD, other, total: lossOfCrop + drip + cropD + other };
-}
-
-function projectAll({ acres, level, owlsOn, activeIds }){
-  let agg = {
-    natPA_off:0, trtPA_off:0, natPA_on:0, trtPA_on:0,
-    dN_base:{lossOfCrop:0,drip:0,cropD:0,other:0,total:0},
-    dT_base:{lossOfCrop:0,drip:0,cropD:0,other:0,total:0},
-    dN_owl:{lossOfCrop:0,drip:0,cropD:0,other:0,total:0},
-    dT_owl:{lossOfCrop:0,drip:0,cropD:0,other:0,total:0},
-  };
-
-  activeIds.forEach(id=>{
-    const spec = SPECIES[id];
-    const N0 = initialize(spec, acres, level);
-    const T0 = cloneP(N0);
-
-    // Owls OFF
-    const N_off = annualStep(spec, N0, acres, false);
-    const T_off = annualStep(spec, T0, acres, false);
-    const T_off_after = cloneP(T_off.P);
-    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T_off_after[a][s] *= SURVIVE_ANNUAL;
-    const natPA_off = sumAll(N_off.P)/acres;
-    const trtPA_off = sumAll(T_off_after)/acres;
-    const dN_base = damages(spec, acres, level, false, null);
-    const dT_base = damages(spec, acres, level, true , null);
-
-    // Owls ON
-    const N_on = annualStep(spec, N0, acres, true);
-    const T_on = annualStep(spec, T0, acres, true);
-    const T_on_after = cloneP(T_on.P);
-    for(let a=0;a<3;a++) for(let s=0;s<2;s++) T_on_after[a][s] *= SURVIVE_ANNUAL;
-    const natPA_on = sumAll(N_on.P)/acres;
-    const trtPA_on = sumAll(T_on_after)/acres;
-
-    // Map population drop → damage discounts
-    const eps=1e-9;
-    const rN = Math.max(0,(natPA_off-natPA_on)/Math.max(eps,natPA_off));
-    const rT = Math.max(0,(trtPA_off-trtPA_on)/Math.max(eps,trtPA_off));
-    const rHatN = Math.min(1, GAMMA*rN);
-    const rHatT = Math.min(1, GAMMA*rT);
-    const factorsN = { yieldFactor:1 - BETA_YIELD*rHatN, nonYieldFactor:1 - BETA_NON*rHatN };
-    const factorsT = { yieldFactor:1 - BETA_YIELD*rHatT, nonYieldFactor:1 - BETA_NON*rHatT };
-
-    const dN_owl = damages(spec, acres, level, false, factorsN);
-    const dT_owl = damages(spec, acres, level, true , factorsT);
-
-    // Aggregate
-    agg.natPA_off+=natPA_off; agg.trtPA_off+=trtPA_off; agg.natPA_on+=natPA_on; agg.trtPA_on+=trtPA_on;
-    for(const k of["lossOfCrop","drip","cropD","other","total"]){
-      agg.dN_base[k]+=dN_base[k]; agg.dT_base[k]+=dT_base[k];
-      agg.dN_owl[k]+=dN_owl[k];   agg.dT_owl[k]+=dT_owl[k];
-    }
-  });
-
-  const dN = owlsOn ? agg.dN_owl : agg.dN_base;
-  const dT = owlsOn ? agg.dT_owl : agg.dT_base;
-  return { dN, dT };
-}
-
-/* ------------------------------ UI ------------------------------ */
+/* ------------------------------ Helpers ------------------------------ */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-const acreRange=$("#acres"), acreBubble=$("#acreBubble"), owlsChk=$("#owls");
-const speciesBtns=$$(".speciesbtn"), infButtons=$$(".infbtn");
-const natTotalEl=$("#natTotal"), trtTotalEl=$("#trtTotal"), natBreakEl=$("#natBreak"), trtBreakEl=$("#trtBreak");
+const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+function money(n){ return "$"+Math.round(n).toLocaleString("en-US"); }
 
-function fmtMoney(n){ return "$"+Math.round(n).toLocaleString("en-US"); }
-
+/* Bubble over the acres slider */
+const acreRange=$("#acres"), acreBubble=$("#acreBubble");
 function setAcreBubble(){
   const min=+acreRange.min, max=+acreRange.max, val=+acreRange.value;
   acreBubble.textContent=`${val} acres`;
@@ -289,44 +134,175 @@ function setAcreBubble(){
   acreBubble.style.left=`${pct*w}px`;
 }
 
-function activeLevel(){ const btn=infButtons.find(b=>b.classList.contains("active")); return parseInt(btn.dataset.level,10); }
-function getActiveSpecies(){ const ids=speciesBtns.filter(b=>b.classList.contains("active")).map(b=>b.dataset.id); return ids.length?ids:["gopher"]; }
+/* ------------------------------ Model (1-Year, deterministic) ------------------------------ */
+/* Parameters mirror the C++ model where applicable */
+const K_per_acre = 80.0;              // carrying capacity per acre
+const litterMean = 6.0;               // pups per breeding female / year
+const birthFracFemale = 0.70;
+const breederFrac = 0.80;
+const fertSlope = 3.5;                // logistic taper near carrying capacity
+const survJ = 0.45, survS = 0.65, survA = 0.82;
+const agingA = 0.08;                  // adult aging (cap lifespan)
+
+/* Treatment: CO₂ (25% kill per pass, 6 passes/year) */
+const PASSES_PER_YEAR=6, KILL_RATE_PER_PASS=.25;
+const SURVIVE_ANNUAL=Math.pow(1-KILL_RATE_PER_PASS,PASSES_PER_YEAR); // (0.75)^6
+
+/* Owls */
+const OWLS_PER_100_ACRES = 1.9;
+const PREDATION_PER_OWL_PER_WEEK = 2.5; // midpoint of 1–4 (as in C++)
+/* For damages response to Owl Boxes, use a capped discount so effects show clearly */
+const BETA_YIELD = 0.35, BETA_NON = 0.70;   // yield lighter, non-yield stronger
+const OWL_MIN_FACTOR = 0.80;                // at most 20% reduction from owls
+
+/* Economics (C++) */
+const pricePerLb = 2.50;
+const yieldLbPerAcre = 2500.0;
+const lossMild = 0.02, lossMedium = 0.04, lossSevere = 0.06; // NATURAL yield loss rates
+const lossAfterTreat = 0.01;                                  // TREATED yield loss (fixed)
+const dripPerAcre_base = 60.0, cropDmgPerAcre_base = 40.0, otherPerAcre_base = 70.0; // $/acre
+const sevMultMild = 0.8, sevMultMed = 1.0, sevMultSev = 1.2; // severity multiplier (Natural only)
+const maintMultiplierAfterTreat = 0.20; // post-treatment non-yield maintenance (20% of baseline)
+
+/* Initial infestation (adults only), scaled by acres; 1=Small, 2=Medium, 3=Large */
+const basePer10 = {1:20, 2:40, 3:70};
+
+/* Utility: run one deterministic annual step */
+function annualStep(P, acres, owlsOn){
+  let [Jf,Jm,Sf,Sm,Af,Am] = [P[0][0],P[0][1],P[1][0],P[1][1],P[2][0],P[2][1]];
+  const K_total = K_per_acre * acres;
+  const total   = Jf+Jm+Sf+Sm+Af+Am;
+  const density = K_total>0 ? total / K_total : 0.0;
+
+  const fertMult = 1.0 / (1.0 + Math.exp(fertSlope * (density - 1.0)));
+  const breeders = Af * breederFrac;
+  const births   = breeders * litterMean * fertMult;
+  const pupsF    = births * birthFracFemale;
+  const pupsM    = births * (1.0 - birthFracFemale);
+
+  let nextJf = pupsF;
+  let nextJm = pupsM;
+  let nextSf = Jf * survJ;
+  let nextSm = Jm * survJ;
+  let nextAf = Sf * survS + Af * survA;
+  let nextAm = Sm * survS + Am * survA;
+
+  /* Adult aging */
+  nextAf = Math.max(0, nextAf - Af * agingA);
+  nextAm = Math.max(0, nextAm - Am * agingA);
+
+  /* Owl predation proportional to density (if ON) */
+  if (owlsOn){
+    const owlsEff = OWLS_PER_100_ACRES * (acres/100.0);
+    const afterTot = nextJf + nextJm + nextSf + nextSm + nextAf + nextAm;
+    const densityAfter = K_total>0 ? Math.min(1.0, afterTot / K_total) : 0.0;
+    const owlRemoval = owlsEff * PREDATION_PER_OWL_PER_WEEK * 52.0 * Math.max(0.0, Math.min(1.0, densityAfter));
+    if(afterTot > 0.0 && owlRemoval > 0.0){
+      const frac = Math.min(1.0, owlRemoval / afterTot);
+      const k = 1.0 - frac;
+      nextJf*=k; nextJm*=k; nextSf*=k; nextSm*=k; nextAf*=k; nextAm*=k;
+    }
+  }
+
+  return [[nextJf,nextJm],[nextSf,nextSm],[nextAf,nextAm]];
+}
+
+const sumAll=P=>P[0][0]+P[0][1]+P[1][0]+P[1][1]+P[2][0]+P[2][1];
+
+/* Damages per C++ model, with optional owl discount factors applied */
+function damages(acres, level, isTreated, owlYieldFactor=1.0, owlNonFactor=1.0){
+  const baseRevenue = acres * yieldLbPerAcre * pricePerLb;
+
+  const lossRate = isTreated ? lossAfterTreat : (level===1?lossMild:(level===2?lossMedium:lossSevere));
+  let lossOfCrop = baseRevenue * lossRate * clamp(owlYieldFactor, OWL_MIN_FACTOR, 1.0);
+
+  let sevMult = (level===1?sevMultMild:(level===2?sevMultMed:sevMultSev));
+  let drip  = dripPerAcre_base    * (isTreated ? maintMultiplierAfterTreat : sevMult) * acres;
+  let cropD = cropDmgPerAcre_base * (isTreated ? maintMultiplierAfterTreat : sevMult) * acres;
+  let other = otherPerAcre_base   * (isTreated ? maintMultiplierAfterTreat : sevMult) * acres;
+
+  drip  *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
+  cropD *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
+  other *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
+
+  /* Guard against negatives by construction, but clamp anyway */
+  drip = Math.max(0,drip); cropD=Math.max(0,cropD); other=Math.max(0,other); lossOfCrop=Math.max(0,lossOfCrop);
+  const total = lossOfCrop + drip + cropD + other;
+  return { lossOfCrop, drip, cropD, other, total };
+}
+
+/* Main compute for one year; returns damages for Natural & Treated based on the Owl toggle state */
+function computeOneYear(acres, level, owlsOn){
+  /* Build Year 0 adults (all adults, 70% F / 30% M), then step once to Year 1 */
+  const totalInit = basePer10[level] * (acres / 10.0);
+  const Af0 = totalInit * birthFracFemale, Am0 = totalInit * (1.0 - birthFracFemale);
+  const P0 = [[0,0],[0,0],[Af0,Am0]];
+
+  /* OFF branch (reference) */
+  let Pn_off = annualStep(P0, acres, false);
+  let Pt_off = annualStep(P0, acres, false);
+  for(let a=0;a<3;a++) for(let s=0;s<2;s++) Pt_off[a][s] *= SURVIVE_ANNUAL;
+
+  /* ON branch (owls) */
+  let Pn_on = annualStep(P0, acres, true);
+  let Pt_on = annualStep(P0, acres, true);
+  for(let a=0;a<3;a++) for(let s=0;s<2;s++) Pt_on[a][s] *= SURVIVE_ANNUAL;
+
+  const natPA_off = sumAll(Pn_off)/acres, trtPA_off = sumAll(Pt_off)/acres;
+  const natPA_on  = sumAll(Pn_on)/acres,  trtPA_on  = sumAll(Pt_on)/acres;
+
+  /* Population-based owl discount (applied to damage components) */
+  const eps=1e-9;
+  const rN = Math.max(0,(natPA_off - natPA_on) / Math.max(eps, natPA_off)); // fraction reduced by owls
+  const rT = Math.max(0,(trtPA_off - trtPA_on) / Math.max(eps, trtPA_off));
+
+  const owlYieldN = 1 - BETA_YIELD * rN;
+  const owlNonN   = 1 - BETA_NON  * rN;
+  const owlYieldT = 1 - BETA_YIELD * rT;
+  const owlNonT   = 1 - BETA_NON  * rT;
+
+  /* Base damages (owls OFF) */
+  const dN_off = damages(acres, level, false, 1.0, 1.0);
+  const dT_off = damages(acres, level, true , 1.0, 1.0);
+
+  if(!owlsOn){
+    return { dN: dN_off, dT: dT_off };
+  }
+
+  /* Apply owl factors (capped) when toggle is ON */
+  const dN_on  = damages(acres, level, false, owlYieldN, owlNonN);
+  const dT_on  = damages(acres, level, true , owlYieldT, owlNonT);
+  return { dN: dN_on, dT: dT_on };
+}
+
+/* ------------------------------ Render ------------------------------ */
+function activeLevel(){ const btn=$$(".infbtn").find(b=>b.classList.contains("active")); return parseInt(btn.dataset.level,10); }
+
+function fillSide(idPrefix, d){
+  $(`#${idPrefix}_total`).textContent = money(d.total);
+  $(`#${idPrefix}_break`).innerHTML = `
+    <tr><td>Loss of crop</td><td>${money(d.lossOfCrop)}</td></tr>
+    <tr><td>Drip/irrigation</td><td>${money(d.drip)}</td></tr>
+    <tr><td>Crop damage</td><td>${money(d.cropD)}</td></tr>
+    <tr><td>Other O&amp;M</td><td>${money(d.other)}</td></tr>
+    <tr><td>Total</td><td>${money(d.total)}</td></tr>
+  `;
+}
 
 function render(){
-  const acres=+acreRange.value, level=activeLevel(), owlsOn=owlsChk.checked, activeIds=getActiveSpecies();
-  const { dN, dT } = projectAll({ acres, level, owlsOn, activeIds });
+  const acres=+$("#acres").value;
+  const level=activeLevel();
+  const owlsOn=$("#owls").checked;
 
-  natTotalEl.textContent=fmtMoney(dN.total);
-  natBreakEl.innerHTML=`
-    <tr><td>Loss of crop</td><td>${fmtMoney(dN.lossOfCrop)}</td></tr>
-    <tr><td>Drip/irrigation</td><td>${fmtMoney(dN.drip)}</td></tr>
-    <tr><td>Crop damage</td><td>${fmtMoney(dN.cropD)}</td></tr>
-    <tr><td>Other O&amp;M</td><td>${fmtMoney(dN.other)}</td></tr>
-    <tr><td>Total</td><td>${fmtMoney(dN.total)}</td></tr>`;
-  trtTotalEl.textContent=fmtMoney(dT.total);
-  trtBreakEl.innerHTML=`
-    <tr><td>Loss of crop</td><td>${fmtMoney(dT.lossOfCrop)}</td></tr>
-    <tr><td>Drip/irrigation</td><td>${fmtMoney(dT.drip)}</td></tr>
-    <tr><td>Crop damage</td><td>${fmtMoney(dT.cropD)}</td></tr>
-    <tr><td>Other O&amp;M</td><td>${fmtMoney(dT.other)}</td></tr>
-    <tr><td>Total</td><td>${fmtMoney(dT.total)}</td></tr>`;
+  const { dN, dT } = computeOneYear(acres, level, owlsOn);
+  fillSide("nat", dN);
+  fillSide("trt", dT);
 }
 
 /* Events */
 $$(".infbtn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
-    $$(".infbtn").forEach(b=>{ const on=(b===btn); b.classList.toggle("active",on); b.setAttribute("aria-selected",on?"true":"false"); });
-    render();
-  });
-});
-$$(".speciesbtn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    const isActive=btn.classList.contains("active");
-    btn.classList.toggle("active",!isActive);
-    btn.classList.toggle("inactive",isActive);
-    btn.setAttribute("aria-pressed",(!isActive).toString());
-    const anyOn=$$(".speciesbtn").some(b=>b.classList.contains("active"));
-    if(!anyOn){ const g=$$(".speciesbtn").find(b=>b.dataset.id==="gopher"); g.classList.add("active"); g.classList.remove("inactive"); g.setAttribute("aria-pressed","true"); }
+    $$(".infbtn").forEach(b=>{ const on=(b===btn); b.classList.toggle("active",on); b.setAttribute("aria-selected", on?"true":"false"); });
     render();
   });
 });
