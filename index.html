@@ -135,7 +135,6 @@ function setAcreBubble(){
 }
 
 /* ------------------------------ Model (1-Year, deterministic) ------------------------------ */
-/* Mirrors C++ where applicable */
 const K_per_acre = 80.0;
 const litterMean = 6.0;
 const birthFracFemale = 0.70;
@@ -144,23 +143,23 @@ const fertSlope = 3.5;
 const survJ = 0.45, survS = 0.65, survA = 0.82;
 const agingA = 0.08;
 
-/* Owls */
+/* Amplified Owls */
 const OWLS_PER_100_ACRES = 1.9;
-const PREDATION_PER_OWL_PER_WEEK = 2.5; // midpoint of 1–4
-const BETA_YIELD = 0.35, BETA_NON = 0.70;  // owl effect stronger on non-yield
-const OWL_MIN_FACTOR = 0.80;               // cap: at most 20% reduction from owls
+const PREDATION_PER_OWL_PER_WEEK = 4.0;  // ↑ was 2.5 (stronger removal)
+const BETA_YIELD = 0.55;                  // ↑ map pop drop → yield dmg reduction
+const BETA_NON   = 1.00;                  // ↑ map pop drop → non-yield dmg reduction
+const OWL_MIN_FACTOR = 0.60;              // ↓ allow up to 40% reduction per component
 
-/* Economics (C++) */
+/* Economics */
 const pricePerLb = 2.50;
 const yieldLbPerAcre = 2500.0;
 const lossMild = 0.02, lossMedium = 0.04, lossSevere = 0.06;
 const dripPerAcre_base = 60.0, cropDmgPerAcre_base = 40.0, otherPerAcre_base = 70.0;
 const sevMultMild = 0.8, sevMultMed = 1.0, sevMultSev = 1.2;
 
-/* Initial infestation adults per 10 acres; 1=Small,2=Medium,3=Large */
+/* Initial adults per 10 acres */
 const basePer10 = {1:20, 2:40, 3:70};
 
-/* One annual deterministic step for NATURAL only (owls toggle adjusts mortality) */
 function annualStepNatural(P, acres, owlsOn){
   let [Jf,Jm,Sf,Sm,Af,Am] = [P[0][0],P[0][1],P[1][0],P[1][1],P[2][0],P[2][1]];
   const K_total = K_per_acre * acres;
@@ -202,7 +201,7 @@ function annualStepNatural(P, acres, owlsOn){
 
 const sumAll=P=>P[0][0]+P[0][1]+P[1][0]+P[1][1]+P[2][0]+P[2][1];
 
-/* Damage model (Natural only), with optional owl discount factors */
+/* Damage model (Natural only), with amplified owl discount */
 function damagesNatural(acres, level, owlYieldFactor=1.0, owlNonFactor=1.0){
   const baseRevenue = acres * yieldLbPerAcre * pricePerLb;
   const lossRate = (level===1?lossMild:(level===2?lossMedium:lossSevere));
@@ -222,14 +221,12 @@ function damagesNatural(acres, level, owlYieldFactor=1.0, owlNonFactor=1.0){
   return { lossOfCrop, drip, cropD, other, total };
 }
 
-/* Compute NATURAL damages for one year; Owl toggle adjusts both population and damages */
 function computeNaturalOneYear(acres, level, owlsOn){
-  /* Year 0 adults (70% F / 30% M), then single annual step */
   const totalInit = basePer10[level] * (acres / 10.0);
   const Af0 = totalInit * birthFracFemale, Am0 = totalInit * (1.0 - birthFracFemale);
   const P0 = [[0,0],[0,0],[Af0,Am0]];
 
-  /* OFF and ON populations to estimate owl reduction ratio */
+  /* Reference OFF vs ON to derive discount factors */
   const P_off = annualStepNatural(P0, acres, false);
   const P_on  = annualStepNatural(P0, acres, true);
   const natPA_off = sumAll(P_off)/acres, natPA_on = sumAll(P_on)/acres;
@@ -238,7 +235,6 @@ function computeNaturalOneYear(acres, level, owlsOn){
     return damagesNatural(acres, level, 1.0, 1.0);
   }
 
-  /* When ON: translate population drop into damage factors (capped) */
   const eps=1e-9;
   const rN = Math.max(0,(natPA_off - natPA_on) / Math.max(eps, natPA_off)); // fraction reduced by owls
   const owlYield = 1 - BETA_YIELD * rN;
