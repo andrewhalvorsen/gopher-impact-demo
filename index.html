@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Smokin’ Burrow – Gopher Impact (1-Year)</title>
+<title>Smokin’ Burrow – Gopher Impact (1-Year, Natural Only)</title>
 <style>
   :root{ --yellow:#f4cf2f; --ink:#0f172a; --border:#e5e7eb; --bg:#f8fafc; --card:#ffffff; --radius:20px; --shadow:0 18px 40px rgba(0,0,0,.08); }
   *{box-sizing:border-box}
@@ -44,7 +44,7 @@
   .title{ font-size:16px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#374151; display:flex; align-items:center; gap:8px; }
   .pricepill{ padding:2px 10px; border-radius:999px; background:#eef2ff; color:#1f2937; font-size:12px; font-weight:800; }
 
-  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .grid{ display:grid; grid-template-columns:1fr; gap:18px; } /* single column (Natural only) */
   .card{ border:1px solid var(--border); border-radius:16px; padding:16px; background:#fff; }
   .card h3{ margin:0 0 8px; font-size:13px; letter-spacing:.06em; color:#6b7280; text-transform:uppercase; }
   .metric{ display:flex; align-items:baseline; gap:10px; margin:10px 0 6px; }
@@ -56,7 +56,7 @@
   .tbl td:last-child{ text-align:right; font-variant-numeric:tabular-nums; }
   .tbl tr:last-child td{ border-bottom:none; font-weight:800; }
 
-  @media (max-width:1024px){ .wrap{ grid-template-columns:1fr; } .grid{ grid-template-columns:1fr; } }
+  @media (max-width:1024px){ .wrap{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -108,18 +108,11 @@
       </div>
 
       <div class="grid">
-        <!-- NATURAL -->
+        <!-- NATURAL ONLY -->
         <div class="card">
-          <h3>Natural (Untreated)</h3>
+          <h3>Natural</h3>
           <div class="metric"><div class="num" id="nat_total">$—</div><span class="badge">Total Damage</span></div>
           <table class="tbl"><tbody id="nat_break"></tbody></table>
-        </div>
-
-        <!-- TREATED -->
-        <div class="card">
-          <h3>Treated</h3>
-          <div class="metric"><div class="num" id="trt_total">$—</div><span class="badge">Total Damage</span></div>
-          <table class="tbl"><tbody id="trt_break"></tbody></table>
         </div>
       </div>
     </section>
@@ -142,40 +135,33 @@ function setAcreBubble(){
 }
 
 /* ------------------------------ Model (1-Year, deterministic) ------------------------------ */
-/* Parameters mirror the C++ model where applicable */
-const K_per_acre = 80.0;              // carrying capacity per acre
-const litterMean = 6.0;               // pups per breeding female / year
+/* Mirrors C++ where applicable */
+const K_per_acre = 80.0;
+const litterMean = 6.0;
 const birthFracFemale = 0.70;
 const breederFrac = 0.80;
-const fertSlope = 3.5;                // logistic taper near carrying capacity
+const fertSlope = 3.5;
 const survJ = 0.45, survS = 0.65, survA = 0.82;
-const agingA = 0.08;                  // adult aging (cap lifespan)
-
-/* Treatment: CO₂ (25% kill per pass, 6 passes/year) */
-const PASSES_PER_YEAR=6, KILL_RATE_PER_PASS=.25;
-const SURVIVE_ANNUAL=Math.pow(1-KILL_RATE_PER_PASS,PASSES_PER_YEAR); // (0.75)^6
+const agingA = 0.08;
 
 /* Owls */
 const OWLS_PER_100_ACRES = 1.9;
-const PREDATION_PER_OWL_PER_WEEK = 2.5; // midpoint of 1–4 (as in C++)
-/* For damages response to Owl Boxes, use a capped discount so effects show clearly */
-const BETA_YIELD = 0.35, BETA_NON = 0.70;   // yield lighter, non-yield stronger
-const OWL_MIN_FACTOR = 0.80;                // at most 20% reduction from owls
+const PREDATION_PER_OWL_PER_WEEK = 2.5; // midpoint of 1–4
+const BETA_YIELD = 0.35, BETA_NON = 0.70;  // owl effect stronger on non-yield
+const OWL_MIN_FACTOR = 0.80;               // cap: at most 20% reduction from owls
 
 /* Economics (C++) */
 const pricePerLb = 2.50;
 const yieldLbPerAcre = 2500.0;
-const lossMild = 0.02, lossMedium = 0.04, lossSevere = 0.06; // NATURAL yield loss rates
-const lossAfterTreat = 0.01;                                  // TREATED yield loss (fixed)
-const dripPerAcre_base = 60.0, cropDmgPerAcre_base = 40.0, otherPerAcre_base = 70.0; // $/acre
-const sevMultMild = 0.8, sevMultMed = 1.0, sevMultSev = 1.2; // severity multiplier (Natural only)
-const maintMultiplierAfterTreat = 0.20; // post-treatment non-yield maintenance (20% of baseline)
+const lossMild = 0.02, lossMedium = 0.04, lossSevere = 0.06;
+const dripPerAcre_base = 60.0, cropDmgPerAcre_base = 40.0, otherPerAcre_base = 70.0;
+const sevMultMild = 0.8, sevMultMed = 1.0, sevMultSev = 1.2;
 
-/* Initial infestation (adults only), scaled by acres; 1=Small, 2=Medium, 3=Large */
+/* Initial infestation adults per 10 acres; 1=Small,2=Medium,3=Large */
 const basePer10 = {1:20, 2:40, 3:70};
 
-/* Utility: run one deterministic annual step */
-function annualStep(P, acres, owlsOn){
+/* One annual deterministic step for NATURAL only (owls toggle adjusts mortality) */
+function annualStepNatural(P, acres, owlsOn){
   let [Jf,Jm,Sf,Sm,Af,Am] = [P[0][0],P[0][1],P[1][0],P[1][1],P[2][0],P[2][1]];
   const K_total = K_per_acre * acres;
   const total   = Jf+Jm+Sf+Sm+Af+Am;
@@ -216,94 +202,68 @@ function annualStep(P, acres, owlsOn){
 
 const sumAll=P=>P[0][0]+P[0][1]+P[1][0]+P[1][1]+P[2][0]+P[2][1];
 
-/* Damages per C++ model, with optional owl discount factors applied */
-function damages(acres, level, isTreated, owlYieldFactor=1.0, owlNonFactor=1.0){
+/* Damage model (Natural only), with optional owl discount factors */
+function damagesNatural(acres, level, owlYieldFactor=1.0, owlNonFactor=1.0){
   const baseRevenue = acres * yieldLbPerAcre * pricePerLb;
-
-  const lossRate = isTreated ? lossAfterTreat : (level===1?lossMild:(level===2?lossMedium:lossSevere));
+  const lossRate = (level===1?lossMild:(level===2?lossMedium:lossSevere));
   let lossOfCrop = baseRevenue * lossRate * clamp(owlYieldFactor, OWL_MIN_FACTOR, 1.0);
 
-  let sevMult = (level===1?sevMultMild:(level===2?sevMultMed:sevMultSev));
-  let drip  = dripPerAcre_base    * (isTreated ? maintMultiplierAfterTreat : sevMult) * acres;
-  let cropD = cropDmgPerAcre_base * (isTreated ? maintMultiplierAfterTreat : sevMult) * acres;
-  let other = otherPerAcre_base   * (isTreated ? maintMultiplierAfterTreat : sevMult) * acres;
+  const sevMult = (level===1?sevMultMild:(level===2?sevMultMed:sevMultSev));
+  let drip  = dripPerAcre_base    * sevMult * acres;
+  let cropD = cropDmgPerAcre_base * sevMult * acres;
+  let other = otherPerAcre_base   * sevMult * acres;
 
   drip  *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
   cropD *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
   other *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
 
-  /* Guard against negatives by construction, but clamp anyway */
-  drip = Math.max(0,drip); cropD=Math.max(0,cropD); other=Math.max(0,other); lossOfCrop=Math.max(0,lossOfCrop);
+  drip=Math.max(0,drip); cropD=Math.max(0,cropD); other=Math.max(0,other); lossOfCrop=Math.max(0,lossOfCrop);
   const total = lossOfCrop + drip + cropD + other;
   return { lossOfCrop, drip, cropD, other, total };
 }
 
-/* Main compute for one year; returns damages for Natural & Treated based on the Owl toggle state */
-function computeOneYear(acres, level, owlsOn){
-  /* Build Year 0 adults (all adults, 70% F / 30% M), then step once to Year 1 */
+/* Compute NATURAL damages for one year; Owl toggle adjusts both population and damages */
+function computeNaturalOneYear(acres, level, owlsOn){
+  /* Year 0 adults (70% F / 30% M), then single annual step */
   const totalInit = basePer10[level] * (acres / 10.0);
   const Af0 = totalInit * birthFracFemale, Am0 = totalInit * (1.0 - birthFracFemale);
   const P0 = [[0,0],[0,0],[Af0,Am0]];
 
-  /* OFF branch (reference) */
-  let Pn_off = annualStep(P0, acres, false);
-  let Pt_off = annualStep(P0, acres, false);
-  for(let a=0;a<3;a++) for(let s=0;s<2;s++) Pt_off[a][s] *= SURVIVE_ANNUAL;
-
-  /* ON branch (owls) */
-  let Pn_on = annualStep(P0, acres, true);
-  let Pt_on = annualStep(P0, acres, true);
-  for(let a=0;a<3;a++) for(let s=0;s<2;s++) Pt_on[a][s] *= SURVIVE_ANNUAL;
-
-  const natPA_off = sumAll(Pn_off)/acres, trtPA_off = sumAll(Pt_off)/acres;
-  const natPA_on  = sumAll(Pn_on)/acres,  trtPA_on  = sumAll(Pt_on)/acres;
-
-  /* Population-based owl discount (applied to damage components) */
-  const eps=1e-9;
-  const rN = Math.max(0,(natPA_off - natPA_on) / Math.max(eps, natPA_off)); // fraction reduced by owls
-  const rT = Math.max(0,(trtPA_off - trtPA_on) / Math.max(eps, trtPA_off));
-
-  const owlYieldN = 1 - BETA_YIELD * rN;
-  const owlNonN   = 1 - BETA_NON  * rN;
-  const owlYieldT = 1 - BETA_YIELD * rT;
-  const owlNonT   = 1 - BETA_NON  * rT;
-
-  /* Base damages (owls OFF) */
-  const dN_off = damages(acres, level, false, 1.0, 1.0);
-  const dT_off = damages(acres, level, true , 1.0, 1.0);
+  /* OFF and ON populations to estimate owl reduction ratio */
+  const P_off = annualStepNatural(P0, acres, false);
+  const P_on  = annualStepNatural(P0, acres, true);
+  const natPA_off = sumAll(P_off)/acres, natPA_on = sumAll(P_on)/acres;
 
   if(!owlsOn){
-    return { dN: dN_off, dT: dT_off };
+    return damagesNatural(acres, level, 1.0, 1.0);
   }
 
-  /* Apply owl factors (capped) when toggle is ON */
-  const dN_on  = damages(acres, level, false, owlYieldN, owlNonN);
-  const dT_on  = damages(acres, level, true , owlYieldT, owlNonT);
-  return { dN: dN_on, dT: dT_on };
+  /* When ON: translate population drop into damage factors (capped) */
+  const eps=1e-9;
+  const rN = Math.max(0,(natPA_off - natPA_on) / Math.max(eps, natPA_off)); // fraction reduced by owls
+  const owlYield = 1 - BETA_YIELD * rN;
+  const owlNon   = 1 - BETA_NON  * rN;
+  return damagesNatural(acres, level, owlYield, owlNon);
 }
 
 /* ------------------------------ Render ------------------------------ */
 function activeLevel(){ const btn=$$(".infbtn").find(b=>b.classList.contains("active")); return parseInt(btn.dataset.level,10); }
-
-function fillSide(idPrefix, d){
-  $(`#${idPrefix}_total`).textContent = money(d.total);
-  $(`#${idPrefix}_break`).innerHTML = `
-    <tr><td>Loss of crop</td><td>${money(d.lossOfCrop)}</td></tr>
-    <tr><td>Drip/irrigation</td><td>${money(d.drip)}</td></tr>
-    <tr><td>Crop damage</td><td>${money(d.cropD)}</td></tr>
-    <tr><td>Other O&amp;M</td><td>${money(d.other)}</td></tr>
-    <tr><td>Total</td><td>${money(d.total)}</td></tr>
-  `;
-}
 
 function render(){
   const acres=+$("#acres").value;
   const level=activeLevel();
   const owlsOn=$("#owls").checked;
 
-  const { dN, dT } = computeOneYear(acres, level, owlsOn);
-  fillSide("nat", dN);
-  fillSide("trt", dT);
+  const dN = computeNaturalOneYear(acres, level, owlsOn);
+
+  $("#nat_total").textContent = money(dN.total);
+  $("#nat_break").innerHTML = `
+    <tr><td>Loss of crop</td><td>${money(dN.lossOfCrop)}</td></tr>
+    <tr><td>Drip/irrigation</td><td>${money(dN.drip)}</td></tr>
+    <tr><td>Crop damage</td><td>${money(dN.cropD)}</td></tr>
+    <tr><td>Other O&amp;M</td><td>${money(dN.other)}</td></tr>
+    <tr><td>Total</td><td>${money(dN.total)}</td></tr>
+  `;
 }
 
 /* Events */
@@ -316,9 +276,7 @@ $$(".infbtn").forEach(btn=>{
 acreRange.addEventListener("input", ()=>{ setAcreBubble(); render(); });
 $("#owls").addEventListener("change", render);
 window.addEventListener("load", ()=>{
-  // Initialize UI
   setAcreBubble(); render(); window.addEventListener("resize", setAcreBubble);
-  // Show almond price beside title from the model constant
   const priceEl = $("#almondPrice");
   if (priceEl) priceEl.textContent = priceFmt(pricePerLb);
 });
