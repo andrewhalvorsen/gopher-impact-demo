@@ -41,7 +41,8 @@
   .disclaimer{ margin-top:8px; font-size:12px; line-height:1.4; color:#111827; opacity:.9; }
 
   .headerline{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
-  .title{ font-size:16px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#374151; }
+  .title{ font-size:16px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#374151; display:flex; align-items:center; gap:8px; }
+  .pricepill{ padding:2px 10px; border-radius:999px; background:#eef2ff; color:#1f2937; font-size:12px; font-weight:800; }
 
   .grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
   .card{ border:1px solid var(--border); border-radius:16px; padding:16px; background:#fff; }
@@ -90,7 +91,7 @@
           <span class="toggle" aria-hidden="true"></span>
           <span>Owl Boxes</span>
         </label>
-        <!-- NEW DISCLAIMER -->
+        <!-- Disclaimer -->
         <p class="disclaimer">
           *Disclaimer: Estimates are based on research and field data. Results may vary and are not guaranteed.
         </p>
@@ -99,7 +100,12 @@
 
     <!-- RIGHT / RESULTS -->
     <section class="panel right" aria-live="polite" aria-atomic="true">
-      <div class="headerline"><div class="title">1-Year Impact (Almonds)</div></div>
+      <div class="headerline">
+        <div class="title">
+          1-Year Impact (Almonds)
+          <span id="almondPrice" class="pricepill"></span>
+        </div>
+      </div>
 
       <div class="grid">
         <!-- NATURAL -->
@@ -124,6 +130,7 @@
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
 function money(n){ return "$"+Math.round(n).toLocaleString("en-US"); }
+function priceFmt(n){ return "$"+Number(n).toFixed(2)+"/lb"; }
 
 /* Bubble over the acres slider */
 const acreRange=$("#acres"), acreBubble=$("#acreBubble");
@@ -308,7 +315,13 @@ $$(".infbtn").forEach(btn=>{
 });
 acreRange.addEventListener("input", ()=>{ setAcreBubble(); render(); });
 $("#owls").addEventListener("change", render);
-window.addEventListener("load", ()=>{ setAcreBubble(); render(); window.addEventListener("resize", setAcreBubble); });
+window.addEventListener("load", ()=>{
+  // Initialize UI
+  setAcreBubble(); render(); window.addEventListener("resize", setAcreBubble);
+  // Show almond price beside title from the model constant
+  const priceEl = $("#almondPrice");
+  if (priceEl) priceEl.textContent = priceFmt(pricePerLb);
+});
 </script>
 </body>
 </html>
