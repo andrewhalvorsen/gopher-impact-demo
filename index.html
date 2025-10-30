@@ -143,18 +143,23 @@ const fertSlope = 3.5;
 const survJ = 0.45, survS = 0.65, survA = 0.82;
 const agingA = 0.08;
 
-/* Amplified Owls */
-const OWLS_PER_100_ACRES = 2.9;
-const PREDATION_PER_OWL_PER_WEEK = 4.0;  // ↑ was 2.5 (stronger removal)
-const BETA_YIELD = 0.55;                  // ↑ map pop drop → yield dmg reduction
-const BETA_NON   = 1.00;                  // ↑ map pop drop → non-yield dmg reduction
-const OWL_MIN_FACTOR = 0.60;              // ↓ allow up to 40% reduction per component
+/* Amplified Owls (kept from last version) */
+const OWLS_PER_100_ACRES = 1.9;
+const PREDATION_PER_OWL_PER_WEEK = 4.0;  // stronger removal
+const BETA_YIELD = 0.55;                  // pop drop → yield dmg reduction
+const BETA_NON   = 1.00;                  // pop drop → non-yield dmg reduction
+const OWL_MIN_FACTOR = 0.60;              // up to 40% reduction per component
 
 /* Economics */
 const pricePerLb = 2.50;
 const yieldLbPerAcre = 2500.0;
 const lossMild = 0.02, lossMedium = 0.04, lossSevere = 0.06;
-const dripPerAcre_base = 60.0, cropDmgPerAcre_base = 40.0, otherPerAcre_base = 70.0;
+
+/* >>> Rebalanced non-yield baselines (per acre) <<< */
+const dripPerAcre_base = 80.0;    // ↑ was 60
+const cropDmgPerAcre_base = 60.0; // ↑ was 40
+const miscPerAcre_base   = 30.0;  // ↓ was 70  (renamed from "Other O&M")
+
 const sevMultMild = 0.8, sevMultMed = 1.0, sevMultSev = 1.2;
 
 /* Initial adults per 10 acres */
@@ -201,24 +206,24 @@ function annualStepNatural(P, acres, owlsOn){
 
 const sumAll=P=>P[0][0]+P[0][1]+P[1][0]+P[1][1]+P[2][0]+P[2][1];
 
-/* Damage model (Natural only), with amplified owl discount */
+/* Damage model (Natural only), with owl discount */
 function damagesNatural(acres, level, owlYieldFactor=1.0, owlNonFactor=1.0){
   const baseRevenue = acres * yieldLbPerAcre * pricePerLb;
   const lossRate = (level===1?lossMild:(level===2?lossMedium:lossSevere));
   let lossOfCrop = baseRevenue * lossRate * clamp(owlYieldFactor, OWL_MIN_FACTOR, 1.0);
 
   const sevMult = (level===1?sevMultMild:(level===2?sevMultMed:sevMultSev));
+
   let drip  = dripPerAcre_base    * sevMult * acres;
   let cropD = cropDmgPerAcre_base * sevMult * acres;
-  let other = otherPerAcre_base   * sevMult * acres;
+  let misc  = miscPerAcre_base    * sevMult * acres;
 
-  drip  *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
-  cropD *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
-  other *= clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
+  const f = clamp(owlNonFactor, OWL_MIN_FACTOR, 1.0);
+  drip*=f; cropD*=f; misc*=f;
 
-  drip=Math.max(0,drip); cropD=Math.max(0,cropD); other=Math.max(0,other); lossOfCrop=Math.max(0,lossOfCrop);
-  const total = lossOfCrop + drip + cropD + other;
-  return { lossOfCrop, drip, cropD, other, total };
+  drip=Math.max(0,drip); cropD=Math.max(0,cropD); misc=Math.max(0,misc); lossOfCrop=Math.max(0,lossOfCrop);
+  const total = lossOfCrop + drip + cropD + misc;
+  return { lossOfCrop, drip, cropD, misc, total };
 }
 
 function computeNaturalOneYear(acres, level, owlsOn){
@@ -226,7 +231,6 @@ function computeNaturalOneYear(acres, level, owlsOn){
   const Af0 = totalInit * birthFracFemale, Am0 = totalInit * (1.0 - birthFracFemale);
   const P0 = [[0,0],[0,0],[Af0,Am0]];
 
-  /* Reference OFF vs ON to derive discount factors */
   const P_off = annualStepNatural(P0, acres, false);
   const P_on  = annualStepNatural(P0, acres, true);
   const natPA_off = sumAll(P_off)/acres, natPA_on = sumAll(P_on)/acres;
@@ -236,7 +240,7 @@ function computeNaturalOneYear(acres, level, owlsOn){
   }
 
   const eps=1e-9;
-  const rN = Math.max(0,(natPA_off - natPA_on) / Math.max(eps, natPA_off)); // fraction reduced by owls
+  const rN = Math.max(0,(natPA_off - natPA_on) / Math.max(eps, natPA_off));
   const owlYield = 1 - BETA_YIELD * rN;
   const owlNon   = 1 - BETA_NON  * rN;
   return damagesNatural(acres, level, owlYield, owlNon);
@@ -257,7 +261,7 @@ function render(){
     <tr><td>Loss of crop</td><td>${money(dN.lossOfCrop)}</td></tr>
     <tr><td>Drip/irrigation</td><td>${money(dN.drip)}</td></tr>
     <tr><td>Crop damage</td><td>${money(dN.cropD)}</td></tr>
-    <tr><td>Other O&amp;M</td><td>${money(dN.other)}</td></tr>
+    <tr><td>Misc</td><td>${money(dN.misc)}</td></tr>
     <tr><td>Total</td><td>${money(dN.total)}</td></tr>
   `;
 }
